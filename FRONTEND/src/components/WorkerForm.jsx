@@ -66,8 +66,9 @@ const WorkerForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           type="text"
           id="workerName"
           value={name}
+          placeholder='e.g., John Doe'
           onChange={(e) => setName(e.target.value)}
-          className={`mt-1 block w-full px-3 py-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          className={`mt-1 block w-full px-3 py-2 border ${errors.name ? 'border-red-500' : 'border-gray-300'} text-black rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
         />
         {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
       </div>
@@ -80,8 +81,9 @@ const WorkerForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           type="text"
           id="workerExternalId"
           value={workerId}
+          placeholder='e.g., W12345'
           onChange={(e) => setWorkerId(e.target.value)}
-          className={`mt-1 block w-full px-3 py-2 border ${errors.workerId ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          className={`mt-1 block w-full px-3 py-2 border ${errors.workerId ? 'border-red-500' : 'border-gray-300'} text-black rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
         />
         {errors.workerId && <p className="mt-1 text-xs text-red-500">{errors.workerId}</p>}
       </div>
@@ -94,8 +96,9 @@ const WorkerForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           type="tel"
           id="workerContact"
           value={contactNumber}
+          placeholder='e.g., 1234567890'
           onChange={(e) => setContactNumber(e.target.value)}
-          className={`mt-1 block w-full px-3 py-2 border ${errors.contactNumber ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          className={`mt-1 block w-full px-3 py-2 border ${errors.contactNumber ? 'border-red-500' : 'border-gray-300'} text-black rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
         />
         {errors.contactNumber && <p className="mt-1 text-xs text-red-500">{errors.contactNumber}</p>}
       </div>
@@ -108,8 +111,9 @@ const WorkerForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           id="workerAddress"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
+          placeholder='e.g., 123 Main St, City, Country'
           rows="2"
-          className={`mt-1 block w-full px-3 py-2 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          className={`mt-1 block w-full px-3 py-2 border ${errors.address ? 'border-red-500' : 'border-gray-300'} text-black rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
         ></textarea>
         {errors.address && <p className="mt-1 text-xs text-red-500">{errors.address}</p>}
       </div>
@@ -123,7 +127,7 @@ const WorkerForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           id="workerJoiningDate"
           value={joiningDate}
           onChange={(e) => setJoiningDate(e.target.value)}
-          className={`mt-1 block w-full px-3 py-2 border ${errors.joiningDate ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
+          className={`mt-1 block w-full px-3 py-2 border ${errors.joiningDate ? 'border-red-500' : 'border-gray-300'} text-black rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
         />
         {errors.joiningDate && <p className="mt-1 text-xs text-red-500">{errors.joiningDate}</p>}
       </div>

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import BillService from '../../services/BillService';
 import fileDownload from 'js-file-download';
 
-const ViewBillPage = () => {
+const handleViewBill = () => {
   const { id: billId } = useParams();
   const [bill, setBill] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -388,4 +388,4 @@ const ViewBillPage = () => {
   );
 };
 
-export default ViewBillPage;
+export default handleViewBill;

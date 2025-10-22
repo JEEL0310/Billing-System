@@ -1,7 +1,516 @@
+// import React, { useState, useEffect, useCallback } from 'react';
+// import { Link } from 'react-router-dom';
+// import { AnimatePresence, motion } from 'framer-motion';
+// import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+// import ReportService from '../../services/ReportService';
+// import CompanyService from '../../services/CompanyService';
+
+// const TransactionReportPage = () => {
+//   // Helper function to format dates for input fields (YYYY-MM-DD)
+//   const formatDateForInput = (date) => {
+//     const year = date.getFullYear();
+//     const month = String(date.getMonth() + 1).padStart(2, '0');
+//     const day = String(date.getDate()).padStart(2, '0');
+//     return `${year}-${month}-${day}`;
+//   };
+
+//   // Helper function for current month's date range
+//   const getCurrentMonthDateRange = () => {
+//     const today = new Date();
+//     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+//     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+//     return {
+//       startDate: formatDateForInput(firstDay),
+//       endDate: formatDateForInput(lastDay)
+//     };
+//   };
+
+//   const [reportData, setReportData] = useState({ transactions: [], summary: { totalIn: 0, totalOut: 0, netFlow: 0 } });
+//   const [isLoading, setIsLoading] = useState(false);
+//   const [isExporting, setIsExporting] = useState(false);
+//   const [error, setError] = useState('');
+//   const [companies, setCompanies] = useState([]);
+  
+//   const initialDates = getCurrentMonthDateRange();
+//   const [filters, setFilters] = useState({
+//     companyId: '',
+//     type: '',
+//     paymentMethod: '',
+//     startDate: initialDates.startDate,
+//     endDate: initialDates.endDate,
+//     descriptionSearch: '',
+//   });
+  
+//   const paymentMethods = ['Cash', 'Cheque', 'Bank Transfer', 'UPI', 'Other'];
+
+//   useEffect(() => {
+//     CompanyService.getAllCompanies()
+//       .then(response => setCompanies(response.data))
+//       .catch(err => console.error("Failed to fetch companies for filter:", err));
+//   }, []);
+
+//   const fetchTransactionReport = useCallback(async (currentFilters) => {
+//     setIsLoading(true);
+//     setError('');
+//     try {
+//       const params = {};
+//       if (currentFilters.companyId) params.companyId = currentFilters.companyId;
+//       if (currentFilters.type) params.type = currentFilters.type;
+//       if (currentFilters.paymentMethod) params.paymentMethod = currentFilters.paymentMethod;
+//       if (currentFilters.startDate) params.startDate = currentFilters.startDate;
+//       if (currentFilters.endDate) params.endDate = currentFilters.endDate;
+//       if (currentFilters.descriptionSearch) params.descriptionSearch = currentFilters.descriptionSearch;
+
+//       const response = await ReportService.getTransactionReport(params);
+//       setReportData(response.data || { transactions: [], summary: { totalIn: 0, totalOut: 0, netFlow: 0 } });
+//     } catch (err) {
+//       const errMsg = err.response?.data?.message || err.message || 'Failed to fetch transaction report.';
+//       setError(errMsg);
+//       setReportData({ transactions: [], summary: { totalIn: 0, totalOut: 0, netFlow: 0 } });
+//     } finally {
+//       setIsLoading(false);
+//     }
+//   }, []);
+
+//   useEffect(() => {
+//     if (filters.startDate && filters.endDate) {
+//       fetchTransactionReport(filters);
+//     }
+//   }, [filters.startDate, filters.endDate]);
+
+//   const handleFilterChange = (e) => {
+//     const { name, value } = e.target;
+    
+//     // Special handling for start date to adjust end date to end of month
+//     if (name === 'startDate') {
+//       const selectedDate = new Date(value);
+//       const lastDay = new Date(
+//         selectedDate.getFullYear(),
+//         selectedDate.getMonth() + 1,
+//         0
+//       );
+//       setFilters(prev => ({
+//         ...prev,
+//         startDate: value,
+//         endDate: formatDateForInput(lastDay)
+//       }));
+//     } else {
+//       setFilters(prev => ({ ...prev, [name]: value }));
+//     }
+//   };
+
+//   const handleApplyFilters = () => {
+//     fetchTransactionReport(filters);
+//   };
+  
+//   const handleClearFilters = () => {
+//     const currentMonthDates = getCurrentMonthDateRange();
+//     const clearedFilters = {
+//       companyId: '', 
+//       type: '', 
+//       paymentMethod: '',
+//       startDate: currentMonthDates.startDate,
+//       endDate: currentMonthDates.endDate,
+//       descriptionSearch: ''
+//     };
+//     setFilters(clearedFilters);
+//     fetchTransactionReport(clearedFilters);
+//   };
+
+//   const handleMonthChange = (direction) => {
+//     const currentDate = new Date(filters.startDate);
+//     let newYear = currentDate.getFullYear();
+//     let newMonth = currentDate.getMonth();
+
+//     if (direction === 'prev') {
+//       newMonth--;
+//       if (newMonth < 0) {
+//         newMonth = 11;
+//         newYear--;
+//       }
+//     } else {
+//       newMonth++;
+//       if (newMonth > 11) {
+//         newMonth = 0;
+//         newYear++;
+//       }
+//     }
+
+//     const newFirstDay = new Date(newYear, newMonth, 1);
+//     const newLastDay = new Date(newYear, newMonth + 1, 0);
+
+//     setFilters(prev => ({
+//       ...prev,
+//       startDate: formatDateForInput(newFirstDay),
+//       endDate: formatDateForInput(newLastDay)
+//     }));
+//   };
+
+//   const handleExportCSV = async () => {
+//     setIsExporting(true);
+//     setError('');
+//     try {
+//       await ReportService.exportTransactionReportCSV(filters);
+//     } catch (err) {
+//       const errMsg = err.response?.data?.message || err.message || 'Failed to export CSV.';
+//       setError(errMsg);
+//     } finally {
+//       setIsExporting(false);
+//     }
+//   };
+  
+//   const formatDisplayDate = (dateString) => {
+//     if (!dateString) return 'N/A';
+//     return new Date(dateString).toLocaleDateString('en-IN', {
+//       day: '2-digit', month: 'short', year: 'numeric'
+//     });
+//   };
+
+//   return (
+//     <motion.div
+//       className="container mx-auto p-4 sm:p-6 md:p-10 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen"
+//       initial={{ opacity: 0 }}
+//       animate={{ opacity: 1 }}
+//       transition={{ duration: 0.5 }}
+//     >
+//       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 sm:mb-8 gap-4">
+//         <motion.h1
+//           className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-800 text-center sm:text-left"
+//           initial={{ y: -20 }}
+//           animate={{ y: 0 }}
+//           transition={{ duration: 0.4 }}
+//         >
+//           Transaction Report
+//         </motion.h1>
+//         <Link
+//           to="/dashboard"
+//           className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+//         >
+//           ← Back to Dashboard
+//         </Link>
+//       </div>
+
+//       {/* Filters Section */}
+//       <motion.div
+//         className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-6 sm:mb-8"
+//         initial={{ y: 20, opacity: 0 }}
+//         animate={{ y: 0, opacity: 1 }}
+//         transition={{ duration: 0.5 }}
+//       >
+//         <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Filters</h2>
+//         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+//           {/* Company Filter */}
+//           <motion.div
+//             initial={{ opacity: 0, x: -20 }}
+//             animate={{ opacity: 1, x: 0 }}
+//             transition={{ duration: 0.3, delay: 0.1 }}
+//           >
+//             <label htmlFor="companyId" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Company</label>
+//             <select
+//               id="companyId"
+//               name="companyId"
+//               value={filters.companyId}
+//               onChange={handleFilterChange}
+//               className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+//             >
+//               <option value="">All Companies</option>
+//               {companies.map(company => (
+//                 <option key={company._id} value={company._id}>{company.name}</option>
+//               ))}
+//             </select>
+//           </motion.div>
+
+//           {/* Type Filter */}
+//           <motion.div
+//             initial={{ opacity: 0, x: -20 }}
+//             animate={{ opacity: 1, x: 0 }}
+//             transition={{ duration: 0.3, delay: 0.2 }}
+//           >
+//             <label htmlFor="type" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Type</label>
+//             <select
+//               id="type"
+//               name="type"
+//               value={filters.type}
+//               onChange={handleFilterChange}
+//               className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+//             >
+//               <option value="">All Types</option>
+//               <option value="IN">IN (Received)</option>
+//               <option value="OUT">OUT (Paid)</option>
+//             </select>
+//           </motion.div>
+
+//           {/* Payment Method Filter */}
+//           <motion.div
+//             initial={{ opacity: 0, x: -20 }}
+//             animate={{ opacity: 1, x: 0 }}
+//             transition={{ duration: 0.3, delay: 0.3 }}
+//           >
+//             <label htmlFor="paymentMethod" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Method</label>
+//             <select
+//               id="paymentMethod"
+//               name="paymentMethod"
+//               value={filters.paymentMethod}
+//               onChange={handleFilterChange}
+//               className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+//             >
+//               <option value="">All Methods</option>
+//               {paymentMethods.map(method => (
+//                 <option key={method} value={method}>{method}</option>
+//               ))}
+//             </select>
+//           </motion.div>
+
+//           {/* Date Range Filters with Navigation */}
+//           <motion.div
+//             initial={{ opacity: 0, x: -20 }}
+//             animate={{ opacity: 1, x: 0 }}
+//             transition={{ duration: 0.3, delay: 0.4 }}
+//             className="flex items-center gap-2"
+//           >
+//             <button 
+//               onClick={() => handleMonthChange('prev')}
+//               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+//               disabled={isLoading || isExporting}
+//             >
+//               &lt;
+//             </button>
+//             <div className="flex-1">
+//               <label htmlFor="startDate" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Start Date</label>
+//               <input
+//                 type="date"
+//                 id="startDate"
+//                 name="startDate"
+//                 value={filters.startDate}
+//                 onChange={handleFilterChange}
+//                 className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+//               />
+//             </div>
+//           </motion.div>
+
+//           <motion.div
+//             initial={{ opacity: 0, x: -20 }}
+//             animate={{ opacity: 1, x: 0 }}
+//             transition={{ duration: 0.3, delay: 0.5 }}
+//             className="flex items-center gap-2"
+//           >
+//             <div className="flex-1">
+//               <label htmlFor="endDate" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">End Date</label>
+//               <input
+//                 type="date"
+//                 id="endDate"
+//                 name="endDate"
+//                 value={filters.endDate}
+//                 onChange={handleFilterChange}
+//                 className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+//               />
+//             </div>
+//             <button 
+//               onClick={() => handleMonthChange('next')}
+//               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+//               disabled={isLoading || isExporting}
+//             >
+//               &gt;
+//             </button>
+//           </motion.div>
+
+//           {/* Description Search */}
+//           <motion.div
+//             initial={{ opacity: 0, x: -20 }}
+//             animate={{ opacity: 1, x: 0 }}
+//             transition={{ duration: 0.3, delay: 0.6 }}
+//           >
+//             <label htmlFor="descriptionSearch" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Description</label>
+//             <input
+//               type="text"
+//               id="descriptionSearch"
+//               name="descriptionSearch"
+//               value={filters.descriptionSearch}
+//               onChange={handleFilterChange}
+//               placeholder="Search in description..."
+//               className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+//             />
+//           </motion.div>
+
+//           {/* Action Buttons */}
+//           <motion.div
+//             className="flex flex-col sm:flex-row gap-2 sm:gap-4 col-span-full sm:col-span-2 lg:col-span-1"
+//             initial={{ opacity: 0 }}
+//             animate={{ opacity: 1 }}
+//             transition={{ duration: 0.3, delay: 0.7 }}
+//           >
+//             <button
+//               onClick={handleApplyFilters}
+//               className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all transform hover:scale-105"
+//               disabled={isLoading || isExporting}
+//             >
+//               Apply Filters
+//             </button>
+//             <button
+//               onClick={handleClearFilters}
+//               className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-all transform hover:scale-105"
+//               disabled={isLoading || isExporting}
+//             >
+//               Clear Filters
+//             </button>
+//           </motion.div>
+//         </div>
+//       </motion.div>
+
+//       <AnimatePresence>
+//         {error && (
+//           <motion.p
+//             className="text-center text-red-500 mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 rounded-lg text-xs sm:text-sm"
+//             initial={{ opacity: 0, y: -10 }}
+//             animate={{ opacity: 1, y: 0 }}
+//             exit={{ opacity: 0, y: -10 }}
+//           >
+//             Error: {error}
+//           </motion.p>
+//         )}
+//       </AnimatePresence>
+
+//       {/* Summary Totals */}
+//       {!isLoading && !error && (
+//         <motion.div
+//           className="mb-6 sm:mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6"
+//           initial={{ opacity: 0, y: 20 }}
+//           animate={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.5 }}
+//         >
+//           {[
+//             { label: 'Total Income', value: reportData.summary?.totalIn, color: 'green' },
+//             { label: 'Total Expenses', value: reportData.summary?.totalOut, color: 'red' },
+//             { label: 'Net Flow', value: reportData.summary?.netFlow, color: 'blue' },
+//           ].map((item, index) => (
+//             <motion.div
+//               key={item.label}
+//               className={`p-4 sm:p-6 bg-white rounded-lg shadow border-t-4 border-${item.color}-500`}
+//               initial={{ opacity: 0, scale: 0.95 }}
+//               animate={{ opacity: 1, scale: 1 }}
+//               transition={{ duration: 0.3, delay: index * 0.1 }}
+//             >
+//               <p className={`text-xs sm:text-sm font-medium text-${item.color}-600`}>{item.label}</p>
+//               <p className={`text-xl sm:text-2xl font-bold text-${item.color}-700`}>
+//                 ₹{item.value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+//               </p>
+//             </motion.div>
+//           ))}
+//         </motion.div>
+//       )}
+
+//       {isLoading && (
+//         <motion.div
+//           className="text-center py-10 text-gray-500 text-sm sm:text-base"
+//           initial={{ opacity: 0 }}
+//           animate={{ opacity: 1 }}
+//           transition={{ duration: 0.3 }}
+//         >
+//           Loading report...
+//         </motion.div>
+//       )}
+
+//       {!isLoading && !error && reportData.transactions.length === 0 && (
+//         <motion.div
+//           className="text-center py-8 sm:py-12 bg-white shadow-lg rounded-xl"
+//           initial={{ opacity: 0, y: 20 }}
+//           animate={{ opacity: 1, y: 0 }}
+//           transition={{ duration: 0.5 }}
+//         >
+//           <p className="text-gray-500 text-sm sm:text-base">No transactions found matching your criteria.</p>
+//         </motion.div>
+//       )}
+
+//       {!isLoading && reportData.transactions.length > 0 && (
+//         <>
+//           <motion.div
+//             className="flex justify-end mb-4 sm:mb-6 gap-2 sm:gap-4"
+//             initial={{ opacity: 0 }}
+//             animate={{ opacity: 1 }}
+//             transition={{ duration: 0.3 }}
+//           >
+//             <button
+//               onClick={handleExportCSV}
+//               disabled={isExporting || isLoading}
+//               className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all"
+//             >
+//               <ArrowDownTrayIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+//               {isExporting ? 'Exporting...' : 'Export CSV'}
+//             </button>
+//           </motion.div>
+//           <motion.div
+//             className="bg-white shadow-lg rounded-xl overflow-hidden"
+//             initial={{ opacity: 0, y: 20 }}
+//             animate={{ opacity: 1, y: 0 }}
+//             transition={{ duration: 0.5 }}
+//           >
+//             <div className="overflow-x-auto">
+//               <table className="min-w-full divide-y divide-gray-200">
+//                 <thead className="bg-gray-100">
+//                   <tr>
+//                     {['Date', 'Type', 'Description', 'Company', 'Amount', 'Method', 'Ref. No.', 'Notes'].map((header) => (
+//                       <th
+//                         key={header}
+//                         className={`px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header === 'Amount' ? 'text-right' : ''}`}
+//                       >
+//                         {header}
+//                       </th>
+//                     ))}
+//                   </tr>
+//                 </thead>
+//                 <tbody className="bg-white divide-y divide-gray-200">
+//                   {reportData.transactions.map((transaction, index) => (
+//                     <motion.tr
+//                       key={transaction._id}
+//                       className="hover:bg-gray-50 transition-colors"
+//                       initial={{ opacity: 0, y: 10 }}
+//                       animate={{ opacity: 1, y: 0 }}
+//                       transition={{ duration: 0.3, delay: index * 0.05 }}
+//                     >
+//                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+//                         {formatDisplayDate(transaction.paymentDate)}
+//                       </td>
+//                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm">
+//                         <span className={`font-semibold ${transaction.type === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
+//                           {transaction.type}
+//                         </span>
+//                       </td>
+//                       <td className="px-3 sm:px-4 py-3 whitespace-normal text-xs sm:text-sm text-gray-700 max-w-[150px] sm:max-w-xs truncate" title={transaction.description}>
+//                         {transaction.description}
+//                       </td>
+//                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+//                         {transaction.company?.name || 'N/A'}
+//                       </td>
+//                       <td className={`px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-right font-medium ${transaction.type === 'IN' ? 'text-green-700' : 'text-red-700'}`}>
+//                         ₹{transaction.amount?.toFixed(2) || '0.00'}
+//                       </td>
+//                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+//                         {transaction.paymentMethod}
+//                       </td>
+//                       <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600 truncate max-w-[80px] sm:max-w-[100px]" title={transaction.referenceNumber}>
+//                         {transaction.referenceNumber || 'N/A'}
+//                       </td>
+//                       <td className="px-3 sm:px-4 py-3 whitespace-normal text-xs sm:text-sm text-gray-600 max-w-[150px] sm:max-w-xs truncate" title={transaction.notes}>
+//                         {transaction.notes || 'N/A'}
+//                       </td>
+//                     </motion.tr>
+//                   ))}
+//                 </tbody>
+//               </table>
+//             </div>
+//           </motion.div>
+//         </>
+//       )}
+//     </motion.div>
+//   );
+// };
+
+// export default TransactionReportPage;
+
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import ReportService from '../../services/ReportService';
 import CompanyService from '../../services/CompanyService';
 
@@ -166,52 +675,175 @@ const TransactionReportPage = () => {
     });
   };
 
+  // StatCard component matching TransactionListPage design
+  const StatCard = ({ title, value, icon, gradient = 'from-slate-500 to-slate-600', bgGradient = 'from-slate-50 to-slate-100', loading }) => (
+    <motion.div
+      className={`relative p-6 bg-gradient-to-br ${bgGradient} rounded-xl shadow-lg border border-slate-200/50 overflow-hidden group`}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`} />
+      <div className="relative z-10 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg bg-gradient-to-br ${gradient} text-white shadow-lg`}>{icon}</div>
+            <div>
+              <p className="text-sm font-medium text-slate-700">{title}</p>
+              {loading ? (
+                <p className="text-gray-400 text-sm mt-1">Loading...</p>
+              ) : (
+                <p className="text-2xl font-bold text-slate-800 mt-1">INR {value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+
   return (
     <motion.div
-      className="container mx-auto p-4 sm:p-6 md:p-10 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen"
+      className="container mx-auto p-6 md:p-10 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 sm:mb-8 gap-4">
-        <motion.h1
-          className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-800 text-center sm:text-left"
-          initial={{ y: -20 }}
-          animate={{ y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          Transaction Report
-        </motion.h1>
-        <Link
-          to="/dashboard"
-          className="text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
-        >
-          ← Back to Dashboard
-        </Link>
+      {/* Header matching TransactionListPage */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 mb-8">
+        <div className="space-y-2">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl">
+              <ChartBarIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <motion.h1 
+                className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent" 
+                initial={{ y: -20 }} 
+                animate={{ y: 0 }} 
+                transition={{ duration: 0.4 }}
+              >
+                Transaction Report
+              </motion.h1>
+              <p className="text-slate-500 text-xs sm:text-sm font-medium">Analyze and export transaction data</p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Summary Totals - Using StatCard components */}
+      {!isLoading && !error && (
+        <motion.div
+          className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <StatCard
+            title="Total Income"
+            value={reportData.summary?.totalIn}
+            icon={<svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+            gradient="from-emerald-500 to-emerald-600"
+            bgGradient="from-emerald-50 to-emerald-100"
+            loading={isLoading}
+          />
+
+          <StatCard
+            title="Total Expenses"
+            value={reportData.summary?.totalOut}
+            icon={<svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>}
+            gradient="from-rose-500 to-rose-600"
+            bgGradient="from-rose-50 to-rose-100"
+            loading={isLoading}
+          />
+
+          <StatCard
+            title="Net Flow"
+            value={reportData.summary?.netFlow}
+            icon={<svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
+            gradient="from-indigo-500 to-indigo-600"
+            bgGradient="from-indigo-50 to-indigo-100"
+            loading={isLoading}
+          />
+        </motion.div>
+      )}
 
       {/* Filters Section */}
       <motion.div
-        className="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-6 sm:mb-8"
+        className="bg-white shadow-lg rounded-xl p-6 mb-8"
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Filters</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-          {/* Company Filter */}
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Filters</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          {/* Start Date with Month Navigation */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
+            className="flex items-center gap-2"
           >
-            <label htmlFor="companyId" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Company</label>
+            <button 
+              onClick={() => handleMonthChange('prev')}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+              disabled={isLoading || isExporting}
+            >
+              &lt;
+            </button>
+            <div className="flex-1">
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+              <input
+                type="date"
+                id="startDate"
+                name="startDate"
+                value={filters.startDate}
+                onChange={handleFilterChange}
+                className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              />
+            </div>
+          </motion.div>
+
+          {/* End Date with Month Navigation */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            className="flex items-center gap-2"
+          >
+            <div className="flex-1">
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+              <input
+                type="date"
+                id="endDate"
+                name="endDate"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+                className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              />
+            </div>
+            <button 
+              onClick={() => handleMonthChange('next')}
+              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+              disabled={isLoading || isExporting}
+            >
+              &gt;
+            </button>
+          </motion.div>
+
+          {/* Company Filter */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+          >
+            <label htmlFor="companyId" className="block text-sm font-medium text-gray-700 mb-1">Company</label>
             <select
               id="companyId"
               name="companyId"
               value={filters.companyId}
               onChange={handleFilterChange}
-              className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+              className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
             >
               <option value="">All Companies</option>
               {companies.map(company => (
@@ -224,15 +856,15 @@ const TransactionReportPage = () => {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
           >
-            <label htmlFor="type" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">Type</label>
             <select
               id="type"
               name="type"
               value={filters.type}
               onChange={handleFilterChange}
-              className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+              className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
             >
               <option value="">All Types</option>
               <option value="IN">IN (Received)</option>
@@ -244,15 +876,15 @@ const TransactionReportPage = () => {
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
+            transition={{ duration: 0.3, delay: 0.5 }}
           >
-            <label htmlFor="paymentMethod" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Method</label>
+            <label htmlFor="paymentMethod" className="block text-sm font-medium text-gray-700 mb-1">Method</label>
             <select
               id="paymentMethod"
               name="paymentMethod"
               value={filters.paymentMethod}
               onChange={handleFilterChange}
-              className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+              className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
             >
               <option value="">All Methods</option>
               {paymentMethods.map(method => (
@@ -261,66 +893,14 @@ const TransactionReportPage = () => {
             </select>
           </motion.div>
 
-          {/* Date Range Filters with Navigation */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.4 }}
-            className="flex items-center gap-2"
-          >
-            <button 
-              onClick={() => handleMonthChange('prev')}
-              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-              disabled={isLoading || isExporting}
-            >
-              &lt;
-            </button>
-            <div className="flex-1">
-              <label htmlFor="startDate" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Start Date</label>
-              <input
-                type="date"
-                id="startDate"
-                name="startDate"
-                value={filters.startDate}
-                onChange={handleFilterChange}
-                className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
-              />
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, delay: 0.5 }}
-            className="flex items-center gap-2"
-          >
-            <div className="flex-1">
-              <label htmlFor="endDate" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">End Date</label>
-              <input
-                type="date"
-                id="endDate"
-                name="endDate"
-                value={filters.endDate}
-                onChange={handleFilterChange}
-                className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
-              />
-            </div>
-            <button 
-              onClick={() => handleMonthChange('next')}
-              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-              disabled={isLoading || isExporting}
-            >
-              &gt;
-            </button>
-          </motion.div>
-
           {/* Description Search */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3, delay: 0.6 }}
+            className="sm:col-span-2 lg:col-span-1"
           >
-            <label htmlFor="descriptionSearch" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="descriptionSearch" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <input
               type="text"
               id="descriptionSearch"
@@ -328,30 +908,30 @@ const TransactionReportPage = () => {
               value={filters.descriptionSearch}
               onChange={handleFilterChange}
               placeholder="Search in description..."
-              className="w-full p-2 sm:p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-xs sm:text-sm"
+              className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
             />
           </motion.div>
 
           {/* Action Buttons */}
           <motion.div
-            className="flex flex-col sm:flex-row gap-2 sm:gap-4 col-span-full sm:col-span-2 lg:col-span-1"
+            className="flex gap-4 sm:col-span-2 lg:col-span-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.7 }}
           >
             <button
               onClick={handleApplyFilters}
-              className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all transform hover:scale-105"
+              className="flex-1 px-4 py-3 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all transform hover:scale-105"
               disabled={isLoading || isExporting}
             >
               Apply Filters
             </button>
             <button
               onClick={handleClearFilters}
-              className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-all transform hover:scale-105"
+              className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-all transform hover:scale-105"
               disabled={isLoading || isExporting}
             >
-              Clear Filters
+              Reset Filters
             </button>
           </motion.div>
         </div>
@@ -360,7 +940,7 @@ const TransactionReportPage = () => {
       <AnimatePresence>
         {error && (
           <motion.p
-            className="text-center text-red-500 mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 rounded-lg text-xs sm:text-sm"
+            className="text-center text-red-500 mb-6 p-4 bg-red-50 rounded-lg"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -370,73 +950,46 @@ const TransactionReportPage = () => {
         )}
       </AnimatePresence>
 
-      {/* Summary Totals */}
-      {!isLoading && !error && (
-        <motion.div
-          className="mb-6 sm:mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          {[
-            { label: 'Total Income', value: reportData.summary?.totalIn, color: 'green' },
-            { label: 'Total Expenses', value: reportData.summary?.totalOut, color: 'red' },
-            { label: 'Net Flow', value: reportData.summary?.netFlow, color: 'blue' },
-          ].map((item, index) => (
-            <motion.div
-              key={item.label}
-              className={`p-4 sm:p-6 bg-white rounded-lg shadow border-t-4 border-${item.color}-500`}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
-            >
-              <p className={`text-xs sm:text-sm font-medium text-${item.color}-600`}>{item.label}</p>
-              <p className={`text-xl sm:text-2xl font-bold text-${item.color}-700`}>
-                ₹{item.value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
-
       {isLoading && (
         <motion.div
-          className="text-center py-10 text-gray-500 text-sm sm:text-base"
+          className="text-center py-12 bg-white shadow-lg rounded-xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
-          Loading report...
+          <p className="text-gray-500">Loading report...</p>
         </motion.div>
       )}
 
       {!isLoading && !error && reportData.transactions.length === 0 && (
         <motion.div
-          className="text-center py-8 sm:py-12 bg-white shadow-lg rounded-xl"
+          className="text-center py-12 bg-white shadow-lg rounded-xl"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <p className="text-gray-500 text-sm sm:text-base">No transactions found matching your criteria.</p>
+          <p className="text-gray-500 text-lg">No transactions found matching your criteria.</p>
         </motion.div>
       )}
 
       {!isLoading && reportData.transactions.length > 0 && (
         <>
           <motion.div
-            className="flex justify-end mb-4 sm:mb-6 gap-2 sm:gap-4"
+            className="flex justify-end mb-6 gap-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            <button
+            <motion.button
               onClick={handleExportCSV}
               disabled={isExporting || isLoading}
-              className="flex items-center px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 rounded-lg hover:shadow-lg disabled:opacity-50 transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <ArrowDownTrayIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+              <ArrowDownTrayIcon className="h-5 w-5" />
               {isExporting ? 'Exporting...' : 'Export CSV'}
-            </button>
+            </motion.button>
           </motion.div>
           <motion.div
             className="bg-white shadow-lg rounded-xl overflow-hidden"
@@ -451,7 +1004,7 @@ const TransactionReportPage = () => {
                     {['Date', 'Type', 'Description', 'Company', 'Amount', 'Method', 'Ref. No.', 'Notes'].map((header) => (
                       <th
                         key={header}
-                        className={`px-3 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header === 'Amount' ? 'text-right' : ''}`}
+                        className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header === 'Amount' ? 'text-right' : ''}`}
                       >
                         {header}
                       </th>
@@ -467,30 +1020,30 @@ const TransactionReportPage = () => {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                     >
-                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                         {formatDisplayDate(transaction.paymentDate)}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm">
                         <span className={`font-semibold ${transaction.type === 'IN' ? 'text-green-600' : 'text-red-600'}`}>
                           {transaction.type}
                         </span>
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-normal text-xs sm:text-sm text-gray-700 max-w-[150px] sm:max-w-xs truncate" title={transaction.description}>
+                      <td className="px-4 py-4 text-sm text-gray-700 max-w-[200px] truncate" title={transaction.description}>
                         {transaction.description}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                         {transaction.company?.name || 'N/A'}
                       </td>
-                      <td className={`px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-right font-medium ${transaction.type === 'IN' ? 'text-green-700' : 'text-red-700'}`}>
+                      <td className={`px-4 py-4 whitespace-nowrap text-sm text-right font-medium ${transaction.type === 'IN' ? 'text-green-700' : 'text-red-700'}`}>
                         ₹{transaction.amount?.toFixed(2) || '0.00'}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                         {transaction.paymentMethod}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-gray-600 truncate max-w-[80px] sm:max-w-[100px]" title={transaction.referenceNumber}>
+                      <td className="px-4 py-4 text-sm text-gray-600 max-w-[100px] truncate" title={transaction.referenceNumber}>
                         {transaction.referenceNumber || 'N/A'}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 whitespace-normal text-xs sm:text-sm text-gray-600 max-w-[150px] sm:max-w-xs truncate" title={transaction.notes}>
+                      <td className="px-4 py-4 text-sm text-gray-600 max-w-[150px] truncate" title={transaction.notes}>
                         {transaction.notes || 'N/A'}
                       </td>
                     </motion.tr>

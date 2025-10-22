@@ -1,10 +1,27 @@
 // import React, { useState, useEffect, useCallback } from 'react';
 // import { Link } from 'react-router-dom';
 // import { motion, AnimatePresence } from 'framer-motion';
-// import { EyeIcon, ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
+// import {
+//   Eye,
+//   Download,
+//   FileText,
+//   ChevronLeft,
+//   ChevronRight,
+//   Filter,
+//   RefreshCw,
+//   ArrowLeft,
+//   X,
+//   Building2,
+//   DollarSign,
+//   TrendingUp,
+//   BarChart3,
+//   Sparkles,
+//   Calendar,
+//   SlidersHorizontal
+// } from 'lucide-react';
 // import LedgerService from '../../services/ComapnyLedgerService';
 // import CompanyService from '../../services/CompanyService';
-
+// import moment from 'moment';
 
 // const LedgerListPage = () => {
 //   const [ledgerData, setLedgerData] = useState(null);
@@ -16,11 +33,28 @@
 //   const [selectedEntry, setSelectedEntry] = useState(null);
 //   const [isModalOpen, setIsModalOpen] = useState(false);
 //   const [companies, setCompanies] = useState([]);
-//   const [filterCompanyId, setFilterCompanyId] = useState('');
+//   const [filterCompanyId, setFilterCompanyId] = useState('all');
 //   const [filterStartDate, setFilterStartDate] = useState('');
 //   const [filterEndDate, setFilterEndDate] = useState('');
 //   const [filterMonth, setFilterMonth] = useState('');
 //   const [filterYear, setFilterYear] = useState('');
+//   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+//   const [showFilters, setShowFilters] = useState(false);
+
+//   // Handle window resize
+//   useEffect(() => {
+//     const handleResize = () => {
+//       setIsMobile(window.innerWidth < 768);
+//       if (window.innerWidth >= 768) {
+//         setShowFilters(true);
+//       } else {
+//         setShowFilters(false);
+//       }
+//     };
+
+//     window.addEventListener('resize', handleResize);
+//     return () => window.removeEventListener('resize', handleResize);
+//   }, []);
 
 //   // Helper function to format dates for input fields (YYYY-MM-DD)
 //   const formatDateForInput = (date) => {
@@ -60,11 +94,12 @@
 
 //   // Fetch ledger data based on filters
 //   const fetchLedgerData = useCallback(async () => {
-//     if (!filterCompanyId && !filterStartDate && !filterEndDate && !filterMonth && !filterYear) return;
 //     setIsLoading(true);
 //     setError('');
 //     const params = {};
-//     if (filterCompanyId) params.companyId = filterCompanyId;
+//     if (filterCompanyId && filterCompanyId !== 'all') {
+//       params.companyId = filterCompanyId;
+//     }
 //     if (filterStartDate && filterEndDate) {
 //       params.startDate = filterStartDate;
 //       params.endDate = filterEndDate;
@@ -73,8 +108,36 @@
 //       params.year = filterYear;
 //     }
 //     try {
-//       const response = await LedgerService.getCompanyLedger(params);
-//       setLedgerData(response.data);
+//       let response;
+//       if (filterCompanyId === 'all') {
+//         response = await LedgerService.getCompaniesLedgerSummary(params);
+//         const aggregatedEntriesArrays = await Promise.all(
+//           response.data.companiesSummary.map(async summary => {
+//             const company = summary.company;
+//             const ledgerRes = await LedgerService.getCompanyLedger({ companyId: company._id, ...params });
+//             return ledgerRes.data.ledgerEntries.map(entry => ({
+//               ...entry,
+//               companyName: company.name
+//             }));
+//           })
+//         );
+//         const aggregatedEntries = aggregatedEntriesArrays.flat();
+//         setLedgerData({
+//           company: { name: 'All Companies' },
+//           ledgerEntries: aggregatedEntries.sort((a, b) => new Date(a.date) - new Date(b.date)),
+//           summary: response.data.grandTotals,
+//           dateRange: response.data.dateRange
+//         });
+//       } else {
+//         response = await LedgerService.getCompanyLedger(params);
+//         setLedgerData({
+//           ...response.data,
+//           ledgerEntries: response.data.ledgerEntries.map(entry => ({
+//             ...entry,
+//             companyName: response.data.company.name
+//           }))
+//         });
+//       }
 //     } catch (err) {
 //       const errMsg = err.response?.data?.message || err.message || 'Failed to fetch ledger data.';
 //       setError(errMsg);
@@ -132,13 +195,38 @@
 //   const handleExportPDF = async () => {
 //     setIsExporting(true);
 //     setExportError('');
+
 //     try {
-//       const params = buildExportParams();
-//       const fileName = `${ledgerData?.company?.name || 'ledger'}_Ledger_${filterStartDate}_to_${filterEndDate}.pdf`;
-//       const response = await LedgerService.downloadCompanyLedgerPDF(params);
-//       LedgerService.triggerDownload(response.data, fileName);
-//     } catch (err) {
-//       setExportError(err.response?.data?.message || 'Failed to export to PDF');
+//       if (!filterStartDate || !filterEndDate) {
+//         throw new Error('Please select a date range');
+//       }
+
+//       const response = await LedgerService.downloadCompanyLedgerPDF({
+//         companyId: filterCompanyId,
+//         startDate: filterStartDate,
+//         endDate: filterEndDate,
+//         month: filterMonth,
+//         year: filterYear
+//       });
+
+//       const fileName = `Ledger_${
+//         filterCompanyId === 'all' ? 'All_Companies' : ledgerData?.company?.name || ''
+//       }_${moment(filterStartDate).format('YYYYMMDD')}-${moment(filterEndDate).format('YYYYMMDD')}.pdf`;
+
+//       const url = window.URL.createObjectURL(new Blob([response.data]));
+//       const link = document.createElement('a');
+//       link.href = url;
+//       link.setAttribute('download', fileName);
+//       document.body.appendChild(link);
+//       link.click();
+//       link.parentNode.removeChild(link);
+
+//     } catch (error) {
+//       const errorMsg = error.response?.data?.message ||
+//                      error.message ||
+//                      'Failed to export PDF';
+//       setExportError(errorMsg);
+//       console.error('Export error:', error);
 //     } finally {
 //       setIsExporting(false);
 //     }
@@ -146,7 +234,8 @@
 
 //   const buildExportParams = () => {
 //     const params = {};
-//     if (filterCompanyId) params.companyId = filterCompanyId;
+//     params.companyId = filterCompanyId || 'all';
+
 //     if (filterStartDate && filterEndDate) {
 //       params.startDate = filterStartDate;
 //       params.endDate = filterEndDate;
@@ -189,7 +278,7 @@
 //   };
 
 //   const clearFilters = () => {
-//     setFilterCompanyId('');
+//     setFilterCompanyId('all');
 //     const today = new Date();
 //     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
 //     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -197,488 +286,725 @@
 //     setFilterEndDate(formatDateForInput(lastDay));
 //     setFilterMonth(String(today.getMonth() + 1).padStart(2, '0'));
 //     setFilterYear(String(today.getFullYear()));
+//     if (isMobile) setShowFilters(false);
 //   };
 
 //   if (isLoading && !ledgerData && companiesSummary.length === 0) {
 //     return (
-//       <motion.div
-//         className="container mx-auto p-8 text-center text-gray-500"
-//         initial={{ opacity: 0 }}
-//         animate={{ opacity: 1 }}
-//         transition={{ duration: 0.3 }}
-//       >
-//         Loading data...
-//       </motion.div>
+//       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+//         <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50">
+//           <RefreshCw className="h-12 w-12 text-violet-600 animate-spin mx-auto mb-4" />
+//           <p className="text-slate-600 font-medium">Loading ledger data...</p>
+//         </div>
+//       </div>
 //     );
 //   }
 
 //   return (
 //     <motion.div
-//       className="container mx-auto p-6 md:p-10 bg-gradient-to-br from-gray-50 to-gray-10 min-h-screen"
+//       className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"
 //       initial={{ opacity: 0 }}
 //       animate={{ opacity: 1 }}
 //       transition={{ duration: 0.5 }}
 //     >
-//       <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-//         <motion.h1
-//           className="text-4xl font-extrabold text-gray-800"
-//           initial={{ y: -20 }}
-//           animate={{ y: 0 }}
+//       <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4">
+//         {/* Header Section */}
+//         <motion.div
+//           className="mb-4"
+//           initial={{ y: -20, opacity: 0 }}
+//           animate={{ y: 0, opacity: 1 }}
 //           transition={{ duration: 0.4 }}
 //         >
-//           Company Ledger
-//         </motion.h1>
-//       </div>
-
-//       {/* Summary Cards */}
-//       <motion.div
-//         className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6"
-//         initial={{ opacity: 0, y: 20 }}
-//         animate={{ opacity: 1, y: 0 }}
-//         transition={{ duration: 0.5 }}
-//       >
-//         {[
-//           { label: 'Total Sales', value: ledgerData?.summary?.totalSales, color: 'blue', loading: isLoading },
-//           { label: 'Total Purchases', value: ledgerData?.summary?.totalPurchases, color: 'orange', loading: isLoading },
-//           { label: 'Net Balance', value: ledgerData?.summary?.netBalance, type: ledgerData?.summary?.balanceType, color: 'green', loading: isLoading },
-//         ].map((item, index) => (
-//           <motion.div
-//             key={item.label}
-//             className={`p-6 bg-white rounded-xl shadow-lg border-t-4 border-${item.color}-500`}
-//             initial={{ opacity: 0, scale: 0.95 }}
-//             animate={{ opacity: 1, scale: 1 }}
-//             transition={{ duration: 0.3, delay: index * 0.1 }}
-//           >
-//             <h3 className={`text-sm font-medium text-${item.color}-600`}>{item.label}</h3>
-//             {item.loading ? (
-//               <p className="text-gray-400">Loading...</p>
-//             ) : (
-//               <p className={`text-2xl font-bold text-${item.color}-700`}>
-//                 INR {item.value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
-//                 {item.type && ` (${item.type})`}
-//               </p>
-//             )}
-//           </motion.div>
-//         ))}
-//       </motion.div>
-
-//       {/* Export Error Display */}
-//       <AnimatePresence>
-//         {exportError && (
-//           <motion.div
-//             className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded"
-//             initial={{ opacity: 0, y: -20 }}
-//             animate={{ opacity: 1, y: 0 }}
-//             exit={{ opacity: 0, y: -20 }}
-//           >
-//             <p>Export Error: {exportError}</p>
-//           </motion.div>
-//         )}
-//       </AnimatePresence>
-
-//       {/* Filters Section with Export Buttons */}
-//       <motion.div
-//         className="bg-white shadow-lg rounded-xl p-6 mb-8"
-//         initial={{ y: 20, opacity: 0 }}
-//         animate={{ y: 0, opacity: 1 }}
-//         transition={{ duration: 0.5 }}
-//       >
-//         <div className="flex justify-between items-center mb-4">
-//           <h2 className="text-lg font-semibold text-gray-800">Filters</h2>
-//           <div className="flex gap-2">
-//             <motion.button
-//               onClick={handleExportExcel}
-//               disabled={isExporting || isLoading || !ledgerData}
-//               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all"
-//               whileHover={{ scale: 1.05 }}
-//               whileTap={{ scale: 0.95 }}
-//             >
-//               <ArrowDownTrayIcon className="h-4 w-4" />
-//               Export Excel
-//             </motion.button>
-//             <motion.button
-//               onClick={handleExportPDF}
-//               disabled={isExporting || isLoading || !ledgerData}
-//               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-all"
-//               whileHover={{ scale: 1.05 }}
-//               whileTap={{ scale: 0.95 }}
-//             >
-//               <ArrowDownTrayIcon className="h-4 w-4" />
-//               Export PDF
-//             </motion.button>
-//           </div>
-//         </div>
-
-//         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-//           {/* Company Filter */}
-//           <motion.div
-//             initial={{ opacity: 0, x: -20 }}
-//             animate={{ opacity: 1, x: 0 }}
-//             transition={{ duration: 0.3, delay: 0.1 }}
-//           >
-//             <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
-//             <select
-//               value={filterCompanyId}
-//               onChange={(e) => setFilterCompanyId(e.target.value)}
-//               className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-//             >
-//               <option value="">Select Company</option>
-//               {companies.map((company) => (
-//                 <option key={company._id} value={company._id}>
-//                   {company.name}
-//                 </option>
-//               ))}
-//             </select>
-//           </motion.div>
-
-//           {/* Month/Year Filter */}
-//           <motion.div
-//             initial={{ opacity: 0, x: -20 }}
-//             animate={{ opacity: 1, x: 0 }}
-//             transition={{ duration: 0.3, delay: 0.2 }}
-//             className="flex items-center gap-2"
-//           >
-//             <button
-//               onClick={() => handleMonthChange('prev')}
-//               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-//               disabled={isLoading}
-//             >
-//               &lt;
-//             </button>
-//             <div className="flex-1">
-//               <label className="block text-sm font-medium text-gray-700 mb-1">Month/Year</label>
-//               <div className="flex gap-2">
-//                 <select
-//                   value={filterMonth}
-//                   onChange={(e) => setFilterMonth(e.target.value)}
-//                   className="w-1/2 p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-//                 >
-//                   {Array.from({ length: 12 }, (_, i) => (
-//                     <option key={i + 1} value={String(i + 1).padStart(2, '0')}>
-//                       {new Date(0, i).toLocaleString('en-IN', { month: 'long' })}
-//                     </option>
-//                   ))}
-//                 </select>
-//                 <select
-//                   value={filterYear}
-//                   onChange={(e) => setFilterYear(e.target.value)}
-//                   className="w-1/2 p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-//                 >
-//                   {Array.from({ length: 10 }, (_, i) => {
-//                     const year = new Date().getFullYear() - 5 + i;
-//                     return <option key={year} value={year}>{year}</option>;
-//                   })}
-//                 </select>
+//           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+//             <div className="flex items-center gap-3">
+//               <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 shadow-lg">
+//                 <FileText className="h-6 w-6 text-white" />
+//               </div>
+//               <div>
+//                 <h1 className="text-lg lg:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+//                   Company Ledger
+//                 </h1>
+//                 <p className="text-slate-500 text-xs lg:text-sm font-medium">
+//                   Track and manage company transactions
+//                 </p>
 //               </div>
 //             </div>
-//             <button
-//               onClick={() => handleMonthChange('next')}
-//               className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
-//               disabled={isLoading}
-//             >
-//               &gt;
-//             </button>
-//           </motion.div>
 
-//           {/* Start Date */}
-//           <motion.div
-//             initial={{ opacity: 0, x: -20 }}
-//             animate={{ opacity: 1, x: 0 }}
-//             transition={{ duration: 0.3, delay: 0.3 }}
-//           >
-//             <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-//             <input
-//               type="date"
-//               value={filterStartDate}
-//               onChange={(e) => {
-//                 setFilterStartDate(e.target.value);
-//                 setFilterMonth('');
-//                 setFilterYear('');
-//               }}
-//               className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-//             />
-//           </motion.div>
-
-//           {/* End Date */}
-//           <motion.div
-//             initial={{ opacity: 0, x: -20 }}
-//             animate={{ opacity: 1, x: 0 }}
-//             transition={{ duration: 0.3, delay: 0.4 }}
-//           >
-//             <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-//             <input
-//               type="date"
-//               value={filterEndDate}
-//               onChange={(e) => {
-//                 setFilterEndDate(e.target.value);
-//                 setFilterMonth('');
-//                 setFilterYear('');
-//               }}
-//               className="w-full p-3 border border-gray-200 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-//             />
-//           </motion.div>
-
-//           {/* Filter Actions */}
-//           <motion.div
-//             className="flex gap-4 sm:col-span-2 lg:col-span-1"
-//             initial={{ opacity: 0 }}
-//             animate={{ opacity: 1 }}
-//             transition={{ duration: 0.3, delay: 0.5 }}
-//           >
-//             <button
-//               onClick={fetchLedgerData}
-//               className="flex-1 px-4 py-3 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-all transform hover:scale-105"
-//               disabled={isLoading}
-//             >
-//               Apply Filters
-//             </button>
-//             <button
-//               onClick={clearFilters}
-//               className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 transition-all transform hover:scale-105"
-//               disabled={isLoading}
-//             >
-//               Reset Filters
-//             </button>
-//           </motion.div>
-//         </div>
-//       </motion.div>
-
-//       {/* Modal for Ledger Entry Details */}
-//       <AnimatePresence>
-//         {isModalOpen && selectedEntry && (
-//           <motion.div
-//             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-//             initial={{ opacity: 0 }}
-//             animate={{ opacity: 1 }}
-//             exit={{ opacity: 0 }}
-//             onClick={closeModal}
-//           >
-//             <motion.div
-//               className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl"
-//               initial={{ scale: 0.9, opacity: 0 }}
-//               animate={{ scale: 1, opacity: 1 }}
-//               exit={{ scale: 0.9, opacity: 0 }}
-//               transition={{ duration: 0.3 }}
-//               onClick={(e) => e.stopPropagation()}
-//             >
-//               <div className="flex justify-between items-center mb-4">
-//                 <h2 className="text-xl font-bold text-gray-800">Ledger Entry Details</h2>
-//                 <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 transition-colors">
-//                   <XMarkIcon className="h-6 w-6" />
-//                 </button>
-//               </div>
-//               <div className="space-y-3">
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Date:</span> {formatDisplayDate(selectedEntry.date)}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Type:</span> {selectedEntry.type}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Document No.:</span> {selectedEntry.docNo}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Description:</span> {selectedEntry.description}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Debit:</span> {selectedEntry.debit ? `₹${selectedEntry.debit.toFixed(2)}` : 'N/A'}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Credit:</span> {selectedEntry.credit ? `₹${selectedEntry.credit.toFixed(2)}` : 'N/A'}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Reference ID:</span> {selectedEntry.referenceId}
-//                 </p>
-//                 <p className="text-sm text-gray-600">
-//                   <span className="font-medium">Reference Type:</span> {selectedEntry.referenceType}
-//                 </p>
-//               </div>
-//               <div className="mt-6 flex justify-end">
-//                 <button
-//                   onClick={closeModal}
-//                   className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all transform hover:scale-105"
+//             <div className="flex flex-wrap gap-3">
+//               {isMobile && (
+//                 <motion.button
+//                   onClick={() => setShowFilters(!showFilters)}
+//                   className={`px-3 py-2 rounded-xl font-semibold text-xs transition-all duration-200 ${
+//                     showFilters
+//                       ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+//                       : "bg-white text-slate-700 hover:bg-slate-50 shadow-md border border-slate-200"
+//                   }`}
+//                   whileHover={{ scale: 1.02 }}
+//                   whileTap={{ scale: 0.98 }}
 //                 >
-//                   Close
-//                 </button>
-//               </div>
-//             </motion.div>
-//           </motion.div>
-//         )}
-//       </AnimatePresence>
-
-//       {/* Error Display */}
-//       <AnimatePresence>
-//         {error && (
-//           <motion.p
-//             className="text-center text-red-500 mb-6 p-4 bg-red-50 rounded-lg"
-//             initial={{ opacity: 0, y: -10 }}
-//             animate={{ opacity: 1, y: 0 }}
-//             exit={{ opacity: 0, y: -10 }}
-//           >
-//             Error: {error}
-//           </motion.p>
-//         )}
-//       </AnimatePresence>
-
-//       {/* Ledger Table */}
-//       {ledgerData?.ledgerEntries?.length > 0 ? (
-//         <motion.div
-//           className="bg-white shadow-lg rounded-xl overflow-hidden"
-//           initial={{ opacity: 0, y: 20 }}
-//           animate={{ opacity: 1, y: 0 }}
-//           transition={{ duration: 0.5 }}
-//         >
-//           <div className="overflow-x-auto">
-//             <table className="min-w-full divide-y divide-gray-200">
-//               <thead className="bg-gray-100">
-//                 <tr>
-//                   {['Date', 'Type', 'Doc No.', 'Description', 'Debit', 'Credit', 'Actions'].map((header) => (
-//                     <th
-//                       key={header}
-//                       className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header === 'Debit' || header === 'Credit' || header === 'Actions' ? 'text-right' : ''}`}
-//                     >
-//                       {header}
-//                     </th>
-//                   ))}
-//                 </tr>
-//               </thead>
-//               <tbody className="bg-white divide-y divide-gray-200">
-//                 {ledgerData.ledgerEntries.map((entry, index) => (
-//                   <motion.tr
-//                     key={`${entry.referenceId}-${index}`}
-//                     className="hover:bg-gray-50 transition-colors"
-//                     initial={{ opacity: 0, y: 10 }}
-//                     animate={{ opacity: 1, y: 0 }}
-//                     transition={{ duration: 0.3, delay: index * 0.05 }}
-//                   >
-//                     <td className="px-4 py-4 text-sm text-gray-600">{formatDisplayDate(entry.date)}</td>
-//                     <td className="px-4 py-4 text-sm">
-//                       <span className={`font-semibold ${entry.type.includes('Sale') || entry.type.includes('Made') ? 'text-green-600' : 'text-red-600'}`}>
-//                         {entry.type}
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-4 text-sm text-gray-600">{entry.docNo}</td>
-//                     <td className="px-4 py-4 text-sm text-gray-700 max-w-[200px] truncate" title={entry.description}>
-//                       {entry.description}
-//                     </td>
-//                     <td className="px-4 py-4 text-sm text-right font-medium text-green-700">
-//                       {entry.debit ? entry.debit.toFixed(2) : ''}
-//                     </td>
-//                     <td className="px-4 py-4 text-sm text-right font-medium text-red-700">
-//                       {entry.credit ? entry.credit.toFixed(2) : ''}
-//                     </td>
-//                     <td className="px-4 py-4 text-right text-sm font-medium flex justify-end space-x-2">
-//                       <motion.button
-//                         onClick={() => handleViewEntry(entry)}
-//                         className="relative text-blue-600 hover:text-blue-900 transition-colors"
-//                         title="View Details"
-//                         whileHover={{ scale: 1.1 }}
-//                         whileTap={{ scale: 0.9 }}
-//                       >
-//                         <EyeIcon className="h-5 w-5" />
-//                         <span className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">View</span>
-//                       </motion.button>
-//                     </td>
-//                   </motion.tr>
-//                 ))}
-//               </tbody>
-//             </table>
+//                   {showFilters ? (
+//                     <>
+//                       <X className="h-4 w-4 mr-2 inline" />
+//                       Hide Filters
+//                     </>
+//                   ) : (
+//                     <>
+//                       <SlidersHorizontal className="h-4 w-4 mr-2 inline" />
+//                       Filters
+//                     </>
+//                   )}
+//                 </motion.button>
+//               )}
+//             </div>
 //           </div>
 //         </motion.div>
-//       ) : (
-//         !isLoading && (
+
+//         {/* Summary Cards */}
+//         <motion.div
+//           className="grid grid-cols-3 lg:grid-cols-3 gap-4 mb-8"
+//           initial={{ y: 20, opacity: 0 }}
+//           animate={{ y: 0, opacity: 1 }}
+//           transition={{ duration: 0.5, delay: 0.1 }}
+//         >
+//           <StatCard
+//             title="Total Sales"
+//             value={ledgerData?.summary?.totalSales || 0}
+//             icon={<TrendingUp className="h-5 w-5" />}
+//             gradient="from-blue-500 to-blue-600"
+//             bgGradient="from-blue-50 to-blue-100"
+//             isLoading={isLoading}
+//           />
+//           <StatCard
+//             title="Total Purchases"
+//             value={ledgerData?.summary?.totalPurchases || 0}
+//             icon={<BarChart3 className="h-5 w-5" />}
+//             gradient="from-orange-500 to-orange-600"
+//             bgGradient="from-orange-50 to-orange-100"
+//             isLoading={isLoading}
+//           />
+//           <StatCard
+//             title="Net Balance"
+//             value={ledgerData?.summary?.netBalance || 0}
+//             subtitle={ledgerData?.summary?.balanceType}
+//             icon={<DollarSign className="h-5 w-5" />}
+//             gradient="from-emerald-500 to-emerald-600"
+//             bgGradient="from-emerald-50 to-emerald-100"
+//             isLoading={isLoading}
+//           />
+//         </motion.div>
+
+//         {/* Export Error Display */}
+//         <AnimatePresence>
+//           {exportError && (
+//             <motion.div
+//               className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-3"
+//               initial={{ opacity: 0, y: -10 }}
+//               animate={{ opacity: 1, y: 0 }}
+//               exit={{ opacity: 0, y: -10 }}
+//             >
+//               <div className="p-1 rounded-full bg-red-100">
+//                 <X className="h-4 w-4" />
+//               </div>
+//               Export Error: {exportError}
+//             </motion.div>
+//           )}
+//         </AnimatePresence>
+
+//         {/* Filters Section */}
+//         <AnimatePresence>
+//           {(showFilters || !isMobile) && (
+//             <motion.div
+//               className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-6 mb-8"
+//               initial={{ opacity: 0, height: 0 }}
+//               animate={{ opacity: 1, height: "auto" }}
+//               exit={{ opacity: 0, height: 0 }}
+//               transition={{ duration: 0.3 }}
+//             >
+//               <div className="flex items-center justify-between mb-6">
+//                 <div className="flex items-center gap-3">
+//                   <div className="p-2.5 bg-violet-50 rounded-xl">
+//                     <Filter className="h-5 w-5 text-violet-600" />
+//                   </div>
+//                   <h2 className="text-lg font-bold text-slate-800">Filters & Export</h2>
+//                 </div>
+
+//                 {/* Action Buttons Desktop */}
+//                 <div className="hidden lg:flex flex-wrap gap-3">
+//                   <motion.button
+//                     onClick={fetchLedgerData}
+//                     className="px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center space-x-2"
+//                     disabled={isLoading}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <Filter className="h-4 w-4" />
+//                     <span>Apply Filters</span>
+//                   </motion.button>
+
+//                   <motion.button
+//                     onClick={clearFilters}
+//                     className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-all flex items-center space-x-2"
+//                     disabled={isLoading}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <X className="h-4 w-4" />
+//                     <span>Reset</span>
+//                   </motion.button>
+
+//                   <motion.button
+//                     onClick={handleExportExcel}
+//                     className="px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all flex items-center space-x-2"
+//                     disabled={isLoading || isExporting}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <Download className="h-4 w-4" />
+//                     <span>Excel</span>
+//                   </motion.button>
+
+//                   <motion.button
+//                     onClick={handleExportPDF}
+//                     className="px-6 py-3 bg-rose-600 text-white font-semibold rounded-xl hover:bg-rose-700 transition-all flex items-center space-x-2"
+//                     disabled={isLoading || isExporting}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <FileText className="h-4 w-4" />
+//                     <span>PDF</span>
+//                   </motion.button>
+//                 </div>
+//               </div>
+
+//               <div className="flex md:flex-row flex-col md:items-end items-start gap-4 md:flex-wrap">
+//                 {/* Action Buttons Mobile */}
+//                 <div className="lg:hidden flex flex-wrap gap-2 lg:gap-3">
+//                   <motion.button
+//                     onClick={fetchLedgerData}
+//                     className="px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center"
+//                     disabled={isLoading}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <Filter className="h-4 w-4 mr-2" />
+//                     <span className="text-xs">Apply</span>
+//                   </motion.button>
+
+//                   <motion.button
+//                     onClick={clearFilters}
+//                     className="px-3 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-all flex items-center space-x-2"
+//                     disabled={isLoading}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <X className="h-4 w-4" />
+//                     <span className="text-xs">Clear</span>
+//                   </motion.button>
+
+//                   <motion.button
+//                     onClick={handleExportExcel}
+//                     className="px-3 py-2 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all flex items-center space-x-2"
+//                     disabled={isLoading || isExporting}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <Download className="h-4 w-4" />
+//                     <span className="text-xs">Excel</span>
+//                   </motion.button>
+
+//                   <motion.button
+//                     onClick={handleExportPDF}
+//                     className="px-3 py-2 bg-rose-600 text-white font-semibold rounded-xl hover:bg-rose-700 transition-all flex items-center space-x-2"
+//                     disabled={isLoading || isExporting}
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     <FileText className="h-4 w-4" />
+//                     <span className="text-xs">PDF</span>
+//                   </motion.button>
+//                 </div>
+
+//                 {/* Date Range */}
+//                 <div className="w-full md:flex-1">
+//                   <label className="block text-sm font-semibold text-slate-700 mb-2">Date Range</label>
+//                   <div className="flex items-center space-x-2">
+//                     <motion.button
+//                       onClick={() => handleMonthChange("prev")}
+//                       className="p-2 lg:p-3 rounded-lg lg:rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+//                       disabled={isLoading}
+//                       whileHover={{ scale: 1.05 }}
+//                       whileTap={{ scale: 0.95 }}
+//                     >
+//                       <ChevronLeft className="h-4 w-4 text-slate-600" />
+//                     </motion.button>
+
+//                     <div className="flex space-x-2 flex-1">
+//                       <input
+//                         type="date"
+//                         value={filterStartDate}
+//                         onChange={(e) => setFilterStartDate(e.target.value)}
+//                         className="px-2 py-2.5 text-sm border border-slate-200 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all bg-white md:w-40 w-full"
+//                       />
+//                       <input
+//                         type="date"
+//                         value={filterEndDate}
+//                         onChange={(e) => setFilterEndDate(e.target.value)}
+//                         className="px-2 py-2.5 text-sm border border-slate-200 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all bg-white md:w-40 w-full"
+//                       />
+//                     </div>
+
+//                     <motion.button
+//                       onClick={() => handleMonthChange("next")}
+//                       className="p-2 lg:p-3 rounded-lg lg:rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+//                       disabled={isLoading}
+//                       whileHover={{ scale: 1.05 }}
+//                       whileTap={{ scale: 0.95 }}
+//                     >
+//                       <ChevronRight className="h-4 w-4 text-slate-600" />
+//                     </motion.button>
+//                   </div>
+//                 </div>
+
+//                 {/* Company Filter */}
+//                 <div className="w-full md:flex-1 md:min-w-[200px]">
+//                   <label className="block text-sm font-semibold text-slate-700 mb-2">Company</label>
+//                   <select
+//                     value={filterCompanyId}
+//                     onChange={(e) => setFilterCompanyId(e.target.value)}
+//                     className="w-full px-2 py-2.5 lg:px-4 lg:py-3 border border-slate-200 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all bg-white text-sm"
+//                   >
+//                     <option value="all">All Companies</option>
+//                     {companies.map((company) => (
+//                       <option key={company._id} value={company._id}>
+//                         {company.name}
+//                       </option>
+//                     ))}
+//                   </select>
+//                 </div>
+//               </div>
+//             </motion.div>
+//           )}
+//         </AnimatePresence>
+
+//         {/* Modal for Ledger Entry Details */}
+//         <AnimatePresence>
+//           {isModalOpen && selectedEntry && (
+//             <motion.div
+//               className="fixed inset-0 z-50 flex items-center justify-center p-4"
+//               initial={{ opacity: 0 }}
+//               animate={{ opacity: 1 }}
+//               exit={{ opacity: 0 }}
+//             >
+//               <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
+//               <motion.div
+//                 className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-auto p-6 z-10 overflow-auto max-h-[80vh]"
+//                 initial={{ scale: 0.95, y: 20 }}
+//                 animate={{ scale: 1, y: 0 }}
+//                 exit={{ scale: 0.95, y: 20 }}
+//                 transition={{ duration: 0.3 }}
+//                 onClick={(e) => e.stopPropagation()}
+//               >
+//                 <div className="flex items-start justify-between mb-4">
+//                   <div className="flex items-center gap-3">
+//                     <div className="p-2 rounded-lg bg-violet-50">
+//                       <FileText className="h-5 w-5 text-violet-600" />
+//                     </div>
+//                     <div>
+//                       <h3 className="text-lg font-bold text-slate-800">Ledger Entry Details</h3>
+//                       <p className="text-sm text-slate-500">Entry information</p>
+//                     </div>
+//                   </div>
+//                   <button
+//                     onClick={closeModal}
+//                     className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-200"
+//                   >
+//                     <X className="h-5 w-5" />
+//                   </button>
+//                 </div>
+
+//                 <div className="space-y-3">
+//                   <div className="p-3 bg-slate-50 rounded-lg">
+//                     <p className="text-xs text-slate-500 mb-1">Company</p>
+//                     <p className="text-sm font-medium text-slate-800">{selectedEntry.companyName || 'N/A'}</p>
+//                   </div>
+
+//                   <div className="grid grid-cols-2 gap-3">
+//                     <div className="p-3 bg-slate-50 rounded-lg">
+//                       <p className="text-xs text-slate-500 mb-1">Date</p>
+//                       <p className="text-sm font-medium text-slate-800">{formatDisplayDate(selectedEntry.date)}</p>
+//                     </div>
+//                     <div className="p-3 bg-slate-50 rounded-lg">
+//                       <p className="text-xs text-slate-500 mb-1">Type</p>
+//                       <p className="text-sm font-medium text-slate-800">{selectedEntry.type}</p>
+//                     </div>
+//                   </div>
+
+//                   <div className="grid grid-cols-2 gap-3">
+//                     <div className="p-3 bg-slate-50 rounded-lg">
+//                       <p className="text-xs text-slate-500 mb-1">Document No.</p>
+//                       <p className="text-sm font-medium text-slate-800">{selectedEntry.docNo}</p>
+//                     </div>
+//                     <div className="p-3 bg-slate-50 rounded-lg">
+//                       <p className="text-xs text-slate-500 mb-1">Reference Type</p>
+//                       <p className="text-sm font-medium text-slate-800">{selectedEntry.referenceType}</p>
+//                     </div>
+//                   </div>
+
+//                   <div className="p-3 bg-slate-50 rounded-lg">
+//                     <p className="text-xs text-slate-500 mb-1">Description</p>
+//                     <p className="text-sm font-medium text-slate-800">{selectedEntry.description}</p>
+//                   </div>
+
+//                   <div className="grid grid-cols-2 gap-3">
+//                     <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+//                       <p className="text-xs text-emerald-600 mb-1">Debit</p>
+//                       <p className="text-sm font-semibold text-emerald-700">
+//                         {selectedEntry.debit ? `₹${selectedEntry.debit.toFixed(2)}` : 'N/A'}
+//                       </p>
+//                     </div>
+//                     <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+//                       <p className="text-xs text-red-600 mb-1">Credit</p>
+//                       <p className="text-sm font-semibold text-red-700">
+//                         {selectedEntry.credit ? `₹${selectedEntry.credit.toFixed(2)}` : 'N/A'}
+//                       </p>
+//                     </div>
+//                   </div>
+
+//                   <div className="p-3 bg-slate-50 rounded-lg">
+//                     <p className="text-xs text-slate-500 mb-1">Reference ID</p>
+//                     <p className="text-sm font-mono text-slate-800">{selectedEntry.referenceId}</p>
+//                   </div>
+//                 </div>
+
+//                 <div className="mt-6 flex justify-end">
+//                   <motion.button
+//                     onClick={closeModal}
+//                     className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all"
+//                     whileHover={{ scale: 1.02 }}
+//                     whileTap={{ scale: 0.98 }}
+//                   >
+//                     Close
+//                   </motion.button>
+//                 </div>
+//               </motion.div>
+//             </motion.div>
+//           )}
+//         </AnimatePresence>
+
+//         {/* Error Display */}
+//         <AnimatePresence>
+//           {error && (
+//             <motion.div
+//               className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-3"
+//               initial={{ opacity: 0, y: -10 }}
+//               animate={{ opacity: 1, y: 0 }}
+//               exit={{ opacity: 0, y: -10 }}
+//             >
+//               <div className="p-1 rounded-full bg-red-100">
+//                 <X className="h-4 w-4" />
+//               </div>
+//               Error: {error}
+//             </motion.div>
+//           )}
+//         </AnimatePresence>
+
+//         {/* Ledger Table */}
+//         {ledgerData?.ledgerEntries?.length > 0 ? (
 //           <motion.div
-//             className="text-center py-12 bg-white shadow-lg rounded-xl"
+//             className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden mb-8"
 //             initial={{ opacity: 0, y: 20 }}
 //             animate={{ opacity: 1, y: 0 }}
 //             transition={{ duration: 0.5 }}
 //           >
-//             <p className="text-gray-500 text-lg">No ledger entries found matching your criteria.</p>
-//           </motion.div>
-//         )
-//       )}
-
-//       {/* Companies Summary Table */}
-//       {companiesSummary.length > 0 && (
-//         <motion.div
-//           className="mt-8 bg-white shadow-lg rounded-xl overflow-hidden"
-//           initial={{ opacity: 0, y: 20 }}
-//           animate={{ opacity: 1, y: 0 }}
-//           transition={{ duration: 0.5 }}
-//         >
-//           <h2 className="text-lg font-semibold text-gray-800 p-6">Companies Ledger Summary</h2>
-//           <div className="overflow-x-auto">
-//             <table className="min-w-full divide-y divide-gray-200">
-//               <thead className="bg-gray-100">
-//                 <tr>
-//                   {['Company', 'Total Sales', 'Total Purchases', 'Payments Received', 'Payments Made', 'Net Balance'].map((header) => (
-//                     <th
-//                       key={header}
-//                       className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header.includes('Total') || header.includes('Payments') || header === 'Net Balance' ? 'text-right' : ''}`}
-//                     >
-//                       {header}
-//                     </th>
-//                   ))}
-//                 </tr>
-//               </thead>
-//               <tbody className="bg-white divide-y divide-gray-200">
-//                 {companiesSummary.map((summary, index) => (
-//                   <motion.tr
-//                     key={summary.company._id}
-//                     className="hover:bg-gray-50 transition-colors"
-//                     initial={{ opacity: 0, y: 10 }}
-//                     animate={{ opacity: 1, y: 0 }}
+//             {isMobile ? (
+//               <div className="divide-y divide-slate-100">
+//                 {ledgerData.ledgerEntries.map((entry, index) => (
+//                   <motion.div
+//                     key={`${entry.referenceId}-${index}`}
+//                     className="p-6 hover:bg-slate-50 transition-colors"
+//                     initial={{ opacity: 0, x: -20 }}
+//                     animate={{ opacity: 1, x: 0 }}
 //                     transition={{ duration: 0.3, delay: index * 0.05 }}
 //                   >
-//                     <td className="px-4 py-4 text-sm text-gray-600">{summary.company.name}</td>
-//                     <td className="px-4 py-4 text-sm text-right font-medium text-blue-700">
-//                       {summary.totals.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-//                     </td>
-//                     <td className="px-4 py-4 text-sm text-right font-medium text-orange-700">
-//                       {summary.totals.totalPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-//                     </td>
-//                     <td className="px-4 py-4 text-sm text-right font-medium text-red-700">
-//                       {summary.totals.totalPaymentsReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-//                     </td>
-//                     <td className="px-4 py-4 text-sm text-right font-medium text-green-700">
-//                       {summary.totals.totalPaymentsMade.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-//                     </td>
-//                     <td className={`px-4 py-4 text-sm text-right font-medium ${summary.totals.balanceType === 'Receivable' ? 'text-green-700' : 'text-red-700'}`}>
-//                       {summary.totals.netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ({summary.totals.balanceType})
-//                     </td>
-//                   </motion.tr>
-//                 ))}
-//               </tbody>
-//             </table>
-//           </div>
-//         </motion.div>
-//       )}
+//                     <div className="flex justify-between items-start mb-4">
+//                       <div>
+//                         <button
+//                           onClick={() => handleViewEntry(entry)}
+//                           className="text-lg font-bold text-violet-600 hover:text-violet-800"
+//                         >
+//                           {entry.companyName}
+//                         </button>
+//                         <p className="text-slate-500 text-sm">{entry.docNo}</p>
+//                       </div>
+//                       <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+//                         entry.type.includes('Sale') || entry.type.includes('Made')
+//                           ? 'bg-emerald-100 text-emerald-700'
+//                           : 'bg-red-100 text-red-700'
+//                       }`}>
+//                         {entry.type}
+//                       </span>
+//                     </div>
 
-//       <motion.div
-//         className="mt-8 text-center"
-//         initial={{ opacity: 0 }}
-//         animate={{ opacity: 1 }}
-//         transition={{ duration: 0.3 }}
-//       >
-//         <Link to="/dashboard" className="text-indigo-600 hover:text-indigo-800 transition-colors">
-//           ← Back to Dashboard
-//         </Link>
-//       </motion.div>
+//                     <div className="space-y-2 mb-4">
+//                       <div className="flex justify-between text-sm">
+//                         <span className="text-slate-500">Date:</span>
+//                         <span className="text-slate-600">{formatDisplayDate(entry.date)}</span>
+//                       </div>
+//                       <div className="flex justify-between text-sm">
+//                         <span className="text-slate-500">Debit:</span>
+//                         <span className="font-semibold text-emerald-700">
+//                           {entry.debit ? `₹${entry.debit.toFixed(2)}` : '-'}
+//                         </span>
+//                       </div>
+//                       <div className="flex justify-between text-sm">
+//                         <span className="text-slate-500">Credit:</span>
+//                         <span className="font-semibold text-red-700">
+//                           {entry.credit ? `₹${entry.credit.toFixed(2)}` : '-'}
+//                         </span>
+//                       </div>
+//                     </div>
+
+//                     <motion.button
+//                       onClick={() => handleViewEntry(entry)}
+//                       className="w-full px-4 py-2 bg-violet-50 text-violet-700 rounded-xl font-medium hover:bg-violet-100 transition-colors flex items-center justify-center gap-2"
+//                       whileTap={{ scale: 0.95 }}
+//                     >
+//                       <Eye className="h-4 w-4" />
+//                       <span className="text-sm">View Details</span>
+//                     </motion.button>
+//                   </motion.div>
+//                 ))}
+//               </div>
+//             ) : (
+//               <div className="overflow-x-auto">
+//                 <table className="min-w-full divide-y divide-slate-200">
+//                   <thead className="bg-slate-50">
+//                     <tr>
+//                       {['Company', 'Date', 'Type', 'Doc No.', 'Description', 'Debit', 'Credit', 'Actions'].map((header) => (
+//                         <th
+//                           key={header}
+//                           className={`px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider ${
+//                             header === 'Debit' || header === 'Credit' || header === 'Actions' ? 'text-right' : ''
+//                           }`}
+//                         >
+//                           {header}
+//                         </th>
+//                       ))}
+//                     </tr>
+//                   </thead>
+//                   <tbody className="bg-white divide-y divide-slate-200">
+//                     {ledgerData.ledgerEntries.map((entry, index) => (
+//                       <motion.tr
+//                         key={`${entry.referenceId}-${index}`}
+//                         className="hover:bg-slate-50 transition-colors"
+//                         initial={{ opacity: 0, y: 10 }}
+//                         animate={{ opacity: 1, y: 0 }}
+//                         transition={{ duration: 0.3, delay: index * 0.03 }}
+//                       >
+//                         <td className="px-6 py-4 text-sm text-slate-600 font-medium">{entry.companyName}</td>
+//                         <td className="px-6 py-4 text-sm text-slate-600">{formatDisplayDate(entry.date)}</td>
+//                         <td className="px-6 py-4 text-sm">
+//                           <span className={`font-semibold ${
+//                             entry.type.includes('Sale') || entry.type.includes('Made')
+//                               ? 'text-emerald-600'
+//                               : 'text-red-600'
+//                           }`}>
+//                             {entry.type}
+//                           </span>
+//                         </td>
+//                         <td className="px-6 py-4 text-sm text-slate-600">{entry.docNo}</td>
+//                         <td className="px-6 py-4 text-sm text-slate-700 max-w-[200px] truncate" title={entry.description}>
+//                           {entry.description}
+//                         </td>
+//                         <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-700">
+//                           {entry.debit ? entry.debit.toFixed(2) : ''}
+//                         </td>
+//                         <td className="px-6 py-4 text-sm text-right font-semibold text-red-700">
+//                           {entry.credit ? entry.credit.toFixed(2) : ''}
+//                         </td>
+//                         <td className="px-6 py-4 text-right text-sm font-medium">
+//                           <motion.button
+//                             onClick={() => handleViewEntry(entry)}
+//                             className="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200"
+//                             whileHover={{ scale: 1.1 }}
+//                             whileTap={{ scale: 0.9 }}
+//                             title="View Details"
+//                           >
+//                             <Eye className="h-4 w-4" />
+//                           </motion.button>
+//                         </td>
+//                       </motion.tr>
+//                     ))}
+//                   </tbody>
+//                 </table>
+//               </div>
+//             )}
+//           </motion.div>
+//         ) : (
+//           !isLoading && (
+//             <motion.div
+//               className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-12 text-center"
+//               initial={{ opacity: 0, y: 20 }}
+//               animate={{ opacity: 1, y: 0 }}
+//               transition={{ duration: 0.5 }}
+//             >
+//               <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 w-fit mx-auto mb-6">
+//                 <FileText className="h-12 w-12 text-slate-400" />
+//               </div>
+//               <h3 className="text-xl font-semibold text-slate-800 mb-2">No ledger entries found</h3>
+//               <p className="text-slate-500">No ledger entries found matching your criteria.</p>
+//             </motion.div>
+//           )
+//         )}
+
+//         {/* Companies Summary Table */}
+//         {companiesSummary.length > 0 && (
+//           <motion.div
+//             className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden mb-8"
+//             initial={{ opacity: 0, y: 20 }}
+//             animate={{ opacity: 1, y: 0 }}
+//             transition={{ duration: 0.5 }}
+//           >
+//             <div className="p-6 border-b border-slate-200">
+//               <div className="flex items-center gap-3">
+//                 <div className="p-2 bg-slate-100 rounded-lg">
+//                   <Building2 className="h-5 w-5 text-slate-600" />
+//                 </div>
+//                 <h2 className="text-lg font-semibold text-slate-800">Companies Ledger Summary</h2>
+//               </div>
+//             </div>
+//             <div className="overflow-x-auto">
+//               <table className="min-w-full divide-y divide-slate-200">
+//                 <thead className="bg-slate-50">
+//                   <tr>
+//                     {['Company', 'Total Sales', 'Total Purchases', 'Payments Received', 'Payments Made', 'Net Balance'].map((header) => (
+//                       <th
+//                         key={header}
+//                         className={`px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider ${
+//                           header.includes('Total') || header.includes('Payments') || header === 'Net Balance' ? 'text-right' : ''
+//                         }`}
+//                       >
+//                         {header}
+//                       </th>
+//                     ))}
+//                   </tr>
+//                 </thead>
+//                 <tbody className="bg-white divide-y divide-slate-200">
+//                   {companiesSummary.map((summary, index) => (
+//                     <motion.tr
+//                       key={summary.company._id}
+//                       className="hover:bg-slate-50 transition-colors"
+//                       initial={{ opacity: 0, y: 10 }}
+//                       animate={{ opacity: 1, y: 0 }}
+//                       transition={{ duration: 0.3, delay: index * 0.05 }}
+//                     >
+//                       <td className="px-6 py-4 text-sm text-slate-600 font-medium">{summary.company.name}</td>
+//                       <td className="px-6 py-4 text-sm text-right font-semibold text-blue-700">
+//                         ₹{summary.totals.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+//                       </td>
+//                       <td className="px-6 py-4 text-sm text-right font-semibold text-orange-700">
+//                         ₹{summary.totals.totalPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+//                       </td>
+//                       <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-700">
+//                         ₹{summary.totals.totalPaymentsReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+//                       </td>
+//                       <td className="px-6 py-4 text-sm text-right font-semibold text-red-700">
+//                         ₹{summary.totals.totalPaymentsMade.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+//                       </td>
+//                       <td className={`px-6 py-4 text-sm text-right font-bold ${
+//                         summary.totals.balanceType === 'Receivable' ? 'text-emerald-700' : 'text-red-700'
+//                       }`}>
+//                         ₹{summary.totals.netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+//                         <span className="text-xs ml-1">({summary.totals.balanceType})</span>
+//                       </td>
+//                     </motion.tr>
+//                   ))}
+//                 </tbody>
+//               </table>
+//             </div>
+//           </motion.div>
+//         )}
+
+//         {/* Back to Dashboard Link */}
+//         <motion.div
+//           className="mt-8 text-center"
+//           initial={{ opacity: 0 }}
+//           animate={{ opacity: 1 }}
+//           transition={{ duration: 0.3, delay: 0.5 }}
+//         >
+//           <Link
+//             to="/dashboard"
+//             className="inline-flex items-center gap-2 text-violet-600 hover:text-violet-800 font-medium transition-colors duration-200"
+//           >
+//             <ArrowLeft className="h-4 w-4" />
+//             Back to Dashboard
+//           </Link>
+//         </motion.div>
+//       </div>
 //     </motion.div>
 //   );
 // };
 
-// export default LedgerListPage;
+// // Reusable StatCard Component
+// const StatCard = ({ title, value, subtitle, icon, gradient, bgGradient, isLoading }) => (
+//   <motion.div
+//     className={`relative p-4 lg:p-6 bg-gradient-to-br ${bgGradient} rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden group hover:shadow-xl transition-all duration-300`}
+//     whileHover={{ y: -2 }}
+//   >
+//     <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`} />
 
+//     <div className="relative z-10">
+//       <div className="flex items-center justify-center lg:justify-between mb-4">
+//         <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} text-white shadow-lg`}>
+//           {icon}
+//         </div>
+//         <TrendingUp className="h-5 w-5 hidden lg:block text-slate-400 group-hover:text-slate-600 transition-colors duration-300" />
+//       </div>
+//       <div className='text-center lg:text-left'>
+//         {isLoading ? (
+//           <p className="text-slate-400">Loading...</p>
+//         ) : (
+//           <>
+//             <p className="text-2xl font-bold text-slate-800 mb-1">
+//               ₹{typeof value === 'number' ? value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+//             </p>
+//             <p className="text-sm font-medium text-slate-600">
+//               {title}
+//               {subtitle && <span className="text-xs ml-1">({subtitle})</span>}
+//             </p>
+//           </>
+//         )}
+//       </div>
+//     </div>
+//   </motion.div>
+// );
+
+// export default LedgerListPage;
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EyeIcon, ArrowDownTrayIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  Eye,
+  Download,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  RefreshCw,
+  ArrowLeft,
+  X,
+  Building2,
+  DollarSign,
+  TrendingUp,
+  BarChart3,
+  Sparkles,
+  Calendar,
+  SlidersHorizontal
+} from 'lucide-react';
 import LedgerService from '../../services/ComapnyLedgerService';
 import CompanyService from '../../services/CompanyService';
 import moment from 'moment';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 const LedgerListPage = () => {
   const [ledgerData, setLedgerData] = useState(null);
@@ -690,11 +1016,39 @@ const LedgerListPage = () => {
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [companies, setCompanies] = useState([]);
-  const [filterCompanyId, setFilterCompanyId] = useState('all'); // Set 'all' as default
+  const [filterCompanyId, setFilterCompanyId] = useState('all');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showFilters, setShowFilters] = useState(false);
+  const [currentEntryIndex, setCurrentEntryIndex] = useState(0);
+  const [currentSummaryIndex, setCurrentSummaryIndex] = useState(0);
+
+  // Reset indices when data changes
+  useEffect(() => {
+    setCurrentEntryIndex(0);
+  }, [ledgerData?.ledgerEntries]);
+
+  useEffect(() => {
+    setCurrentSummaryIndex(0);
+  }, [companiesSummary]);
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth >= 768) {
+        setShowFilters(true);
+      } else {
+        setShowFilters(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Helper function to format dates for input fields (YYYY-MM-DD)
   const formatDateForInput = (date) => {
@@ -751,11 +1105,9 @@ const LedgerListPage = () => {
       let response;
       if (filterCompanyId === 'all') {
         response = await LedgerService.getCompaniesLedgerSummary(params);
-        // Transform summary data into ledgerEntries format for consistent display
         const aggregatedEntriesArrays = await Promise.all(
           response.data.companiesSummary.map(async summary => {
             const company = summary.company;
-            // Fetch detailed ledger for each company and merge
             const ledgerRes = await LedgerService.getCompanyLedger({ companyId: company._id, ...params });
             return ledgerRes.data.ledgerEntries.map(entry => ({
               ...entry,
@@ -834,54 +1186,50 @@ const LedgerListPage = () => {
     }
   };
 
-const handleExportPDF = async () => {
-  setIsExporting(true);
-  setExportError('');
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    setExportError('');
 
-  try {
-    // Validate date range
-    if (!filterStartDate || !filterEndDate) {
-      throw new Error('Please select a date range');
+    try {
+      if (!filterStartDate || !filterEndDate) {
+        throw new Error('Please select a date range');
+      }
+
+      const response = await LedgerService.downloadCompanyLedgerPDF({
+        companyId: filterCompanyId,
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+        month: filterMonth,
+        year: filterYear
+      });
+
+      const fileName = `Ledger_${
+        filterCompanyId === 'all' ? 'All_Companies' : ledgerData?.company?.name || ''
+      }_${moment(filterStartDate).format('YYYYMMDD')}-${moment(filterEndDate).format('YYYYMMDD')}.pdf`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+
+    } catch (error) {
+      const errorMsg = error.response?.data?.message ||
+                     error.message ||
+                     'Failed to export PDF';
+      setExportError(errorMsg);
+      console.error('Export error:', error);
+    } finally {
+      setIsExporting(false);
     }
-
-    const response = await LedgerService.downloadCompanyLedgerPDF({
-      companyId: filterCompanyId,
-      startDate: filterStartDate,
-      endDate: filterEndDate,
-      month: filterMonth,
-      year: filterYear
-    });
-
-    // Generate filename
-    const fileName = `Ledger_${
-      filterCompanyId === 'all' ? 'All_Companies' : ledgerData?.company?.name || ''
-    }_${moment(filterStartDate).format('YYYYMMDD')}-${moment(filterEndDate).format('YYYYMMDD')}.pdf`;
-
-    // Trigger download
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    
-  } catch (error) {
-    const errorMsg = error.response?.data?.message || 
-                   error.message || 
-                   'Failed to export PDF';
-    setExportError(errorMsg);
-    console.error('Export error:', error);
-  } finally {
-    setIsExporting(false);
-  }
-};
+  };
 
   const buildExportParams = () => {
     const params = {};
-    // Always include companyId, even if it's 'all'
     params.companyId = filterCompanyId || 'all';
-    
+
     if (filterStartDate && filterEndDate) {
       params.startDate = filterStartDate;
       params.endDate = filterEndDate;
@@ -924,7 +1272,7 @@ const handleExportPDF = async () => {
   };
 
   const clearFilters = () => {
-    setFilterCompanyId('all'); // Set back to 'all' when clearing filters
+    setFilterCompanyId('all');
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -932,485 +1280,927 @@ const handleExportPDF = async () => {
     setFilterEndDate(formatDateForInput(lastDay));
     setFilterMonth(String(today.getMonth() + 1).padStart(2, '0'));
     setFilterYear(String(today.getFullYear()));
+    if (isMobile) setShowFilters(false);
   };
 
   if (isLoading && !ledgerData && companiesSummary.length === 0) {
     return (
-      <motion.div
-        className="container mx-auto p-8 text-center text-gray-500"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        Loading data...
-      </motion.div>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50">
+          <RefreshCw className="h-12 w-12 text-violet-600 animate-spin mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Loading ledger data...</p>
+        </div>
+      </div>
     );
   }
 
   return (
     <motion.div
-      className="container mx-auto p-6 md:p-10 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen"
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-        <motion.h1
-          className="text-4xl font-extrabold text-gray-800"
-          initial={{ y: -20 }}
-          animate={{ y: 0 }}
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4">
+        {/* Header Section */}
+        <motion.div
+          className="mb-4"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.4 }}
         >
-          Company Ledger
-        </motion.h1>
-      </div>
-
-      {/* Summary Cards */}
-      <motion.div
-        className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        {[
-          { label: 'Total Sales', value: ledgerData?.summary?.totalSales, color: 'blue', loading: isLoading },
-          { label: 'Total Purchases', value: ledgerData?.summary?.totalPurchases, color: 'orange', loading: isLoading },
-          { label: 'Net Balance', value: ledgerData?.summary?.netBalance, type: ledgerData?.summary?.balanceType, color: 'green', loading: isLoading },
-        ].map((item, index) => (
-          <motion.div
-            key={item.label}
-            className={`p-6 bg-white rounded-xl shadow-lg border-t-4 border-${item.color}-500`}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-          >
-            <h3 className={`text-sm font-medium text-${item.color}-600`}>{item.label}</h3>
-            {item.loading ? (
-              <p className="text-gray-400">Loading...</p>
-            ) : (
-              <p className={`text-2xl font-bold text-${item.color}-700`}>
-                INR {item.value?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
-                {item.type && ` (${item.type})`}
-              </p>
-            )}
-          </motion.div>
-        ))}
-      </motion.div>
-
-      {/* Export Error Display */}
-      <AnimatePresence>
-        {exportError && (
-          <motion.div
-            className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <p>Export Error: {exportError}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Filters Section with Export Buttons */}
-<motion.div
-  className="bg-white shadow-xl rounded-2xl p-6 mb-8 border border-gray-200"
-  initial={{ y: 20, opacity: 0 }}
-  animate={{ y: 0, opacity: 1 }}
-  transition={{ duration: 0.5 }}
->
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-    <h2 className="text-xl font-semibold text-gray-900">Filter Ledger Entries</h2>
-    <div className="flex flex-col sm:flex-row gap-3">
-      <motion.button
-        onClick={handleExportExcel}
-        disabled={isExporting || isLoading || !ledgerData}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        aria-label="Export ledger to Excel"
-      >
-        <ArrowDownTrayIcon className="h-4 w-4" />
-        Export Excel
-      </motion.button>
-      <motion.button
-        onClick={handleExportPDF}
-        disabled={isExporting || isLoading || !ledgerData}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        aria-label="Export ledger to PDF"
-      >
-        <ArrowDownTrayIcon className="h-4 w-4" />
-        Export PDF
-      </motion.button>
-    </div>
-  </div>
-
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-    {/* Company Filter */}
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, delay: 0.1 }}
-    >
-      <label htmlFor="company-filter" className="block text-sm font-medium text-gray-700 mb-1">
-        Company
-      </label>
-      <select
-        id="company-filter"
-        value={filterCompanyId}
-        onChange={(e) => setFilterCompanyId(e.target.value)}
-        className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50"
-        aria-describedby="company-filter-desc"
-      >
-        <option value="all">All Companies</option>
-        {companies.map((company) => (
-          <option key={company._id} value={company._id}>
-            {company.name}
-          </option>
-        ))}
-      </select>
-      <p id="company-filter-desc" className="sr-only">
-        Select a company to filter ledger entries or choose All Companies.
-      </p>
-    </motion.div>
-
-    {/* Start Date */}
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, delay: 0.2 }}
-    >
-      <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">
-        Start Date
-      </label>
-      <div className="relative">
-        <input
-          id="start-date"
-          type="date"
-          value={filterStartDate}
-          onChange={(e) => {
-            setFilterStartDate(e.target.value);
-            setFilterMonth('');
-            setFilterYear('');
-          }}
-          className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 pl-10"
-          aria-describedby="start-date-desc"
-        />
-        <svg
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      <p id="start-date-desc" className="sr-only">
-        Select the start date for filtering ledger entries.
-      </p>
-    </motion.div>
-
-    {/* End Date */}
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, delay: 0.3 }}
-    >
-      <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">
-        End Date
-      </label>
-      <div className="relative">
-        <input
-          id="end-date"
-          type="date"
-          value={filterEndDate}
-          onChange={(e) => {
-            setFilterEndDate(e.target.value);
-            setFilterMonth('');
-            setFilterYear('');
-          }}
-          className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all bg-gray-50 pl-10"
-          aria-describedby="end-date-desc"
-        />
-        <svg
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-      </div>
-      <p id="end-date-desc" className="sr-only">
-        Select the end date for filtering ledger entries.
-      </p>
-    </motion.div>
-  </div>
-
-  {/* Filter Actions */}
-  <motion.div
-    className="mt-6 flex flex-col sm:flex-row gap-3"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 0.3, delay: 0.5 }}
-  >
-    <button
-      onClick={fetchLedgerData}
-      className="flex-1 px-4 py-3 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
-      disabled={isLoading}
-      aria-label="Apply filters to ledger"
-    >
-      {isLoading ? 'Applying...' : 'Apply Filters'}
-    </button>
-    <button
-      onClick={clearFilters}
-      className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105"
-      disabled={isLoading}
-      aria-label="Reset filters"
-    >
-      Reset Filters
-    </button>
-  </motion.div>
-</motion.div>
-
-      {/* Modal for Ledger Entry Details */}
-      <AnimatePresence>
-        {isModalOpen && selectedEntry && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeModal}
-          >
-            <motion.div
-              className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-800">Ledger Entry Details</h2>
-                <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 transition-colors">
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 shadow-lg">
+                <FileText className="h-6 w-6 text-white" />
               </div>
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Company:</span> {selectedEntry.companyName || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Date:</span> {formatDisplayDate(selectedEntry.date)}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Type:</span> {selectedEntry.type}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Document No.:</span> {selectedEntry.docNo}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Description:</span> {selectedEntry.description}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Debit:</span> {selectedEntry.debit ? `₹${selectedEntry.debit.toFixed(2)}` : 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Credit:</span> {selectedEntry.credit ? `₹${selectedEntry.credit.toFixed(2)}` : 'N/A'}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Reference ID:</span> {selectedEntry.referenceId}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Reference Type:</span> {selectedEntry.referenceType}
+              <div>
+                <h1 className="text-lg lg:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+                  Company Ledger
+                </h1>
+                <p className="text-slate-500 text-xs lg:text-sm font-medium">
+                  Track and manage company transactions
                 </p>
               </div>
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={closeModal}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all transform hover:scale-105"
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {isMobile && (
+                <>
+                <motion.button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-3 py-2 rounded-xl font-semibold text-xs transition-all duration-200 ${
+                    showFilters
+                      ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                      : "bg-white text-slate-700 hover:bg-slate-50 shadow-md border border-slate-200"
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  Close
-                </button>
+                  {showFilters ? (
+                    <>
+                      <X className="h-4 w-4 mr-2 inline" />
+                      Hide Filters
+                    </>
+                  ) : (
+                    <>
+                      <SlidersHorizontal className="h-4 w-4 mr-2 inline" />
+                      Filters
+                    </>
+                  )}
+                </motion.button>
+                <motion.button
+                    onClick={handleExportExcel}
+                    className="px-3 py-2 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all flex items-center space-x-2"
+                    disabled={isLoading || isExporting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="text-xs">Excel</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={handleExportPDF}
+                    className="px-3 py-2 bg-rose-600 text-white font-semibold rounded-xl hover:bg-rose-700 transition-all flex items-center space-x-2"
+                    disabled={isLoading || isExporting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="text-xs">PDF</span>
+                  </motion.button>
+                  </>
+              )}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Export Error Display */}
+        <AnimatePresence>
+          {exportError && (
+            <motion.div
+              className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-3"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <div className="p-1 rounded-full bg-red-100">
+                <X className="h-4 w-4" />
+              </div>
+              Export Error: {exportError}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Filters Section */}
+        <AnimatePresence>
+          {(showFilters || !isMobile) && (
+            <motion.div
+              className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-4 mb-8"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-violet-50 rounded-xl">
+                    <Filter className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Filters</h2>
+                </div>
+
+                {/* Action Buttons Desktop */}
+                <div className="hidden lg:flex flex-wrap gap-3">
+                  <motion.button
+                    onClick={fetchLedgerData}
+                    className="px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center space-x-2"
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Filter className="h-4 w-4" />
+                    <span>Apply Filters</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={clearFilters}
+                    className="px-6 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-all flex items-center space-x-2"
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <X className="h-4 w-4" />
+                    <span>Reset</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={handleExportExcel}
+                    className="px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all flex items-center space-x-2"
+                    disabled={isLoading || isExporting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Excel</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={handleExportPDF}
+                    className="px-6 py-3 bg-rose-600 text-white font-semibold rounded-xl hover:bg-rose-700 transition-all flex items-center space-x-2"
+                    disabled={isLoading || isExporting}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>PDF</span>
+                  </motion.button>
+                </div>
+              </div>
+
+              <div className="flex md:flex-row flex-col md:items-end items-start gap-4 md:flex-wrap">
+                {/* Action Buttons Mobile */}
+                <div className="lg:hidden flex flex-wrap gap-2 lg:gap-3">
+                  <motion.button
+                    onClick={fetchLedgerData}
+                    className="px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center"
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Filter className="h-4 w-4 mr-2" />
+                    <span className="text-xs">Apply</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={clearFilters}
+                    className="px-3 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-all flex items-center space-x-2"
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="text-xs">Clear</span>
+                  </motion.button>
+                </div>
+
+                {/* Date Range */}
+                <div className="w-full md:flex-1">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Date Range</label>
+                  <div className="flex items-center space-x-2">
+                    <motion.button
+                      onClick={() => handleMonthChange("prev")}
+                      className="p-2 lg:p-3 rounded-lg lg:rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+                      disabled={isLoading}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <ChevronLeft className="h-4 w-4 text-slate-600" />
+                    </motion.button>
+
+                    <div className="flex space-x-2 flex-1">
+                      <input
+                        type="date"
+                        value={filterStartDate}
+                        onChange={(e) => setFilterStartDate(e.target.value)}
+                        className="px-2 py-2.5 text-sm border border-slate-200 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all bg-white md:w-40 w-full"
+                      />
+                      <input
+                        type="date"
+                        value={filterEndDate}
+                        onChange={(e) => setFilterEndDate(e.target.value)}
+                        className="px-2 py-2.5 text-sm border border-slate-200 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all bg-white md:w-40 w-full"
+                      />
+                    </div>
+
+                    <motion.button
+                      onClick={() => handleMonthChange("next")}
+                      className="p-2 lg:p-3 rounded-lg lg:rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+                      disabled={isLoading}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <ChevronRight className="h-4 w-4 text-slate-600" />
+                    </motion.button>
+                  </div>
+                </div>
+
+                {/* Company Filter */}
+                <div className="w-full md:flex-1 md:min-w-[200px]">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Company</label>
+                  <select
+                    value={filterCompanyId}
+                    onChange={(e) => setFilterCompanyId(e.target.value)}
+                    className="w-full px-2 py-2.5 lg:px-4 lg:py-3 border border-slate-200 text-black rounded-xl shadow-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition-all bg-white text-sm"
+                  >
+                    <option value="all">All Companies</option>
+                    {companies.map((company) => (
+                      <option key={company._id} value={company._id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      {/* Error Display */}
-      <AnimatePresence>
-        {error && (
-          <motion.p
-            className="text-center text-red-500 mb-6 p-4 bg-red-50 rounded-lg"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-          >
-            Error: {error}
-          </motion.p>
-        )}
-      </AnimatePresence>
+        {/* Mobile Tip */}
+            <div className=" lg:hidden flex items-center justify-center gap-2 text-slate-500 text-xs mt-6 pb-6 px-4">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              <span>For better experience, view on desktop</span>
+            </div>
 
-      {/* Ledger Table */}
-      {ledgerData?.ledgerEntries?.length > 0 ? (
+        {/* Summary Cards */}
         <motion.div
-          className="bg-white shadow-lg rounded-xl overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-100">
-                <tr>
-                  {['Company', 'Date', 'Type', 'Doc No.', 'Description', 'Debit', 'Credit', 'Actions'].map((header) => (
-                    <th
-                      key={header}
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header === 'Debit' || header === 'Credit' || header === 'Actions' ? 'text-right' : ''}`}
-                    >
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {ledgerData.ledgerEntries.map((entry, index) => (
-                  <motion.tr
-                    key={`${entry.referenceId}-${index}`}
-                    className="hover:bg-gray-50 transition-colors"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                  >
-                    <td className="px-4 py-4 text-sm text-gray-600">{entry.companyName}</td>
-                    <td className="px-4 py-4 text-sm text-gray-600">{formatDisplayDate(entry.date)}</td>
-                    <td className="px-4 py-4 text-sm">
-                      <span className={`font-semibold ${entry.type.includes('Sale') || entry.type.includes('Made') ? 'text-green-600' : 'text-red-600'}`}>
-                        {entry.type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600">{entry.docNo}</td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[200px] truncate" title={entry.description}>
-                      {entry.description}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-green-700">
-                      {entry.debit ? entry.debit.toFixed(2) : ''}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-red-700">
-                      {entry.credit ? entry.credit.toFixed(2) : ''}
-                    </td>
-                    <td className="px-4 py-4 text-right text-sm font-medium flex justify-end space-x-2">
-                      <motion.button
-                        onClick={() => handleViewEntry(entry)}
-                        className="relative text-blue-600 hover:text-blue-900 transition-colors"
-                        title="View Details"
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                      >
-                        <EyeIcon className="h-5 w-5" />
-                        <span className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">View</span>
-                      </motion.button>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <StatCard
+            title="Total Sales"
+            value={ledgerData?.summary?.totalSales || 0}
+            icon={<TrendingUp className="h-5 w-5" />}
+            gradient="from-blue-500 to-blue-600"
+            bgGradient="from-blue-50 to-blue-100"
+            isLoading={isLoading}
+          />
+          <StatCard
+            title="Total Purchases"
+            value={ledgerData?.summary?.totalPurchases || 0}
+            icon={<BarChart3 className="h-5 w-5" />}
+            gradient="from-orange-500 to-orange-600"
+            bgGradient="from-orange-50 to-orange-100"
+            isLoading={isLoading}
+          />
+          <StatCard
+            title="Net Balance"
+            value={ledgerData?.summary?.netBalance || 0}
+            subtitle={ledgerData?.summary?.balanceType}
+            icon={<DollarSign className="h-5 w-5" />}
+            gradient="from-emerald-500 to-emerald-600"
+            bgGradient="from-emerald-50 to-emerald-100"
+            isLoading={isLoading}
+          />
         </motion.div>
-      ) : (
-        !isLoading && (
-          <motion.div
-            className="text-center py-12 bg-white shadow-lg rounded-xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <p className="text-gray-500 text-lg">No ledger entries found matching your criteria.</p>
-          </motion.div>
-        )
-      )}
 
-      {/* Companies Summary Table */}
-      {companiesSummary.length > 0 && (
-        <motion.div
-          className="mt-8 bg-white shadow-lg rounded-xl overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h2 className="text-lg font-semibold text-gray-800 p-6">Companies Ledger Summary</h2>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-100">
-                <tr>
-                  {['Company', 'Total Sales', 'Total Purchases', 'Payments Received', 'Payments Made', 'Net Balance'].map((header) => (
-                    <th
-                      key={header}
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${header.includes('Total') || header.includes('Payments') || header === 'Net Balance' ? 'text-right' : ''}`}
-                    >
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {companiesSummary.map((summary, index) => (
-                  <motion.tr
-                    key={summary.company._id}
-                    className="hover:bg-gray-50 transition-colors"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
+        {/* Modal for Ledger Entry Details */}
+        <AnimatePresence>
+          {isModalOpen && selectedEntry && (
+            <motion.div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeModal} />
+              <motion.div
+                className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-auto p-6 z-10 overflow-auto max-h-[80vh]"
+                initial={{ scale: 0.95, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 20 }}
+                transition={{ duration: 0.3 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-violet-50">
+                      <FileText className="h-5 w-5 text-violet-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-800">Ledger Entry Details</h3>
+                      <p className="text-sm text-slate-500">Entry information</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closeModal}
+                    className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-200"
                   >
-                    <td className="px-4 py-4 text-sm text-gray-600">{summary.company.name}</td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-blue-700">
-                      {summary.totals.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-orange-700">
-                      {summary.totals.totalPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-red-700">
-                      {summary.totals.totalPaymentsReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-4 text-sm text-right font-medium text-green-700">
-                      {summary.totals.totalPaymentsMade.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className={`px-4 py-4 text-sm text-right font-medium ${summary.totals.balanceType === 'Receivable' ? 'text-green-700' : 'text-red-700'}`}>
-                      {summary.totals.netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ({summary.totals.balanceType})
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-      )}
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
 
-      <motion.div
-        className="mt-8 text-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <Link to="/dashboard" className="text-indigo-600 hover:text-indigo-800 transition-colors">
-          ← Back to Dashboard
-        </Link>
-      </motion.div>
+                <div className="space-y-3">
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Company</p>
+                    <p className="text-sm font-medium text-slate-800">{selectedEntry.companyName || 'N/A'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Date</p>
+                      <p className="text-sm font-medium text-slate-800">{formatDisplayDate(selectedEntry.date)}</p>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Type</p>
+                      <p className="text-sm font-medium text-slate-800">{selectedEntry.type}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Document No.</p>
+                      <p className="text-sm font-medium text-slate-800">{selectedEntry.docNo}</p>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-500 mb-1">Reference Type</p>
+                      <p className="text-sm font-medium text-slate-800">{selectedEntry.referenceType}</p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Description</p>
+                    <p className="text-sm font-medium text-slate-800">{selectedEntry.description}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <p className="text-xs text-emerald-600 mb-1">Debit</p>
+                      <p className="text-sm font-semibold text-emerald-700">
+                        {selectedEntry.debit ? `₹${selectedEntry.debit.toFixed(2)}` : 'N/A'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                      <p className="text-xs text-red-600 mb-1">Credit</p>
+                      <p className="text-sm font-semibold text-red-700">
+                        {selectedEntry.credit ? `₹${selectedEntry.credit.toFixed(2)}` : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Reference ID</p>
+                    <p className="text-sm font-mono text-slate-800">{selectedEntry.referenceId}</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <motion.button
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Close
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Error Display */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-3"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <div className="p-1 rounded-full bg-red-100">
+                <X className="h-4 w-4" />
+              </div>
+              Error: {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* === DESKTOP VIEW === */}
+        {!isMobile && (
+          <>
+            {/* Ledger Table */}
+            {ledgerData?.ledgerEntries?.length > 0 ? (
+              <motion.div
+                className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {['Company', 'Date', 'Type', 'Doc No.', 'Description', 'Debit', 'Credit', 'Actions'].map((header) => (
+                          <th
+                            key={header}
+                            className={`px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider ${
+                              header === 'Debit' || header === 'Credit' || header === 'Actions' ? 'text-right' : ''
+                            }`}
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-200">
+                      {ledgerData.ledgerEntries.map((entry, index) => (
+                        <motion.tr
+                          key={`${entry.referenceId}-${index}`}
+                          className="hover:bg-slate-50 transition-colors"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.03 }}
+                        >
+                          <td className="px-6 py-4 text-sm text-slate-600 font-medium">{entry.companyName}</td>
+                          <td className="px-6 py-4 text-sm text-slate-600">{formatDisplayDate(entry.date)}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className={`font-semibold ${
+                              entry.type.includes('Sale') || entry.type.includes('Made')
+                                ? 'text-emerald-600'
+                                : 'text-red-600'
+                            }`}>
+                              {entry.type}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600">{entry.docNo}</td>
+                          <td className="px-6 py-4 text-sm text-slate-700 max-w-[200px] truncate" title={entry.description}>
+                            {entry.description}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-700">
+                            {entry.debit ? entry.debit.toFixed(2) : ''}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-red-700">
+                            {entry.credit ? entry.credit.toFixed(2) : ''}
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-medium">
+                            <motion.button
+                              onClick={() => handleViewEntry(entry)}
+                              className="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition-all duration-200"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </motion.button>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            ) : (
+              !isLoading && (
+                <motion.div
+                  className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-12 text-center"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 w-fit mx-auto mb-6">
+                    <FileText className="h-12 w-12 text-slate-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">No ledger entries found</h3>
+                  <p className="text-slate-500">No ledger entries found matching your criteria.</p>
+                </motion.div>
+              )
+            )}
+
+            {/* Companies Summary Table */}
+            {companiesSummary.length > 0 && (
+              <motion.div
+                className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden mb-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <div className="p-6 border-b border-slate-200">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-100 rounded-lg">
+                      <Building2 className="h-5 w-5 text-slate-600" />
+                    </div>
+                    <h2 className="text-lg font-semibold text-slate-800">Companies Ledger Summary</h2>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {['Company', 'Total Sales', 'Total Purchases', 'Payments Received', 'Payments Made', 'Net Balance'].map((header) => (
+                          <th
+                            key={header}
+                            className={`px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider ${
+                              header.includes('Total') || header.includes('Payments') || header === 'Net Balance' ? 'text-right' : ''
+                            }`}
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-slate-200">
+                      {companiesSummary.map((summary, index) => (
+                        <motion.tr
+                          key={summary.company._id}
+                          className="hover:bg-slate-50 transition-colors"
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                        >
+                          <td className="px-6 py-4 text-sm text-slate-600 font-medium">{summary.company.name}</td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-blue-700">
+                            ₹{summary.totals.totalSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-orange-700">
+                            ₹{summary.totals.totalPurchases.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-700">
+                            ₹{summary.totals.totalPaymentsReceived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-red-700">
+                            ₹{summary.totals.totalPaymentsMade.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className={`px-6 py-4 text-sm text-right font-bold ${
+                            summary.totals.balanceType === 'Receivable' ? 'text-emerald-700' : 'text-red-700'
+                          }`}>
+                            ₹{summary.totals.netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            <span className="text-xs ml-1">({summary.totals.balanceType})</span>
+                          </td>
+                        </motion.tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            )}
+          </>
+        )}
+
+        {/* === MOBILE VIEW: Card Layout with Navigation === */}
+        {isMobile && (
+          <>
+            {/* Mobile Navigation */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-4 mb-6">
+              <div className="top-0 z-10 px-2 pb-2">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-slate-800 uppercase">Ledger Entries</h3>
+                <p className="text-xs text-slate-500">{currentEntryIndex + 1} of {ledgerData?.ledgerEntries?.length || 0}</p>
+              </div>
+            </div>
+
+            {/* Ledger Cards */}
+            {ledgerData?.ledgerEntries?.length > 0 ? (
+              <div className="relative">
+                <motion.div
+                  key={`${ledgerData.ledgerEntries[currentEntryIndex].referenceId}-${currentEntryIndex}`}
+                  className="bg-white/80 backdrop-blur-sm rounded-xl border p-4 hover:shadow-2xl hover:scale-105 transition-all duration-300"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                >
+                  <div className="flex justify-between items-start gap-3 mb-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-slate-800 text-base truncate">
+                        {ledgerData.ledgerEntries[currentEntryIndex].companyName}
+                      </h3>
+                      <p className="text-xs text-slate-500 truncate">
+                        {ledgerData.ledgerEntries[currentEntryIndex].docNo}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-1 text-xs font-semibold rounded-lg ${
+                      ledgerData.ledgerEntries[currentEntryIndex].type.includes('Sale') 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {ledgerData.ledgerEntries[currentEntryIndex].type}
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm text-slate-600 mb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-slate-50 rounded-lg p-2">
+                        <p className="text-xs text-slate-500">Date</p>
+                        <p className="font-medium">
+                          {formatDisplayDate(ledgerData.ledgerEntries[currentEntryIndex].date)}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 rounded-lg p-2">
+                        <p className="text-xs text-slate-500">Type</p>
+                        <p className="font-medium">
+                          {ledgerData.ledgerEntries[currentEntryIndex].type}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-emerald-50 rounded-lg p-2">
+                        <p className="text-xs text-emerald-600">Debit</p>
+                        <p className="font-medium text-emerald-700">
+                          ₹{ledgerData.ledgerEntries[currentEntryIndex].debit?.toFixed(2) || '-'}
+                        </p>
+                      </div>
+                      <div className="bg-red-50 rounded-lg p-2">
+                        <p className="text-xs text-red-600">Credit</p>
+                        <p className="font-medium text-red-700">
+                          ₹{ledgerData.ledgerEntries[currentEntryIndex].credit?.toFixed(2) || '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-2">
+                      <p className="text-xs text-slate-500">Description</p>
+                      <p className="font-medium truncate">
+                        {ledgerData.ledgerEntries[currentEntryIndex].description || '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <motion.button
+                      onClick={() => handleViewEntry(ledgerData.ledgerEntries[currentEntryIndex])}
+                      className="flex-1 px-3 py-2 bg-violet-50 text-violet-700 rounded-lg font-medium hover:bg-violet-100 transition-colors flex items-center justify-center gap-1.5"
+                      whileTap={{ scale: 0.97 }}
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span className="text-sm">View Details</span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+
+                {/* Navigation Buttons */}
+                <div className="flex items-center justify-between mt-4 px-2">
+                  <motion.button
+                    onClick={() => setCurrentEntryIndex(prev => Math.max(0, prev - 1))}
+                    disabled={currentEntryIndex === 0}
+                    className={`p-2 rounded-lg ${
+                      currentEntryIndex === 0
+                        ? 'bg-slate-100 text-slate-400'
+                        : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                    } transition-colors`}
+                    whileHover={currentEntryIndex !== 0 ? { scale: 1.05 } : {}}
+                    whileTap={currentEntryIndex !== 0 ? { scale: 0.95 } : {}}
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </motion.button>
+                  <div className="flex items-center gap-2">
+                    {[...Array(Math.min(5, ledgerData.ledgerEntries.length))].map((_, i) => {
+                      const pageIndex = Math.floor(currentEntryIndex / 5) * 5 + i;
+                      if (pageIndex >= ledgerData.ledgerEntries.length) return null;
+                      return (
+                        <motion.button
+                          key={pageIndex}
+                          onClick={() => setCurrentEntryIndex(pageIndex)}
+                          className={`w-2 h-2 rounded-full transition-all ${
+                            currentEntryIndex === pageIndex
+                              ? 'bg-violet-600 scale-125'
+                              : 'bg-slate-300 hover:bg-violet-400'
+                          }`}
+                          whileHover={{ scale: 1.2 }}
+                          whileTap={{ scale: 0.8 }}
+                        />
+                      );
+                    })}
+                  </div>
+                  <motion.button
+                    onClick={() => setCurrentEntryIndex(prev => 
+                      Math.min(ledgerData.ledgerEntries.length - 1, prev + 1)
+                    )}
+                    disabled={currentEntryIndex === ledgerData.ledgerEntries.length - 1}
+                    className={`p-2 rounded-lg ${
+                      currentEntryIndex === ledgerData.ledgerEntries.length - 1
+                        ? 'bg-slate-100 text-slate-400'
+                        : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                    } transition-colors`}
+                    whileHover={currentEntryIndex !== ledgerData.ledgerEntries.length - 1 ? { scale: 1.05 } : {}}
+                    whileTap={currentEntryIndex !== ledgerData.ledgerEntries.length - 1 ? { scale: 0.95 } : {}}
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </motion.button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 px-4 text-center bg-white/80 backdrop-blur-sm rounded-xl border border-slate-200/50">
+                <FileText className="h-8 w-8 text-slate-400 mx-auto mb-3" />
+                <p className="text-slate-600 font-medium">No ledger entries found</p>
+                <p className="text-xs text-slate-500 mt-1">Try adjusting your filters</p>
+              </div>
+            )}
+            </div>
+
+            {/* Companies Summary Cards with Navigation */}
+            {companiesSummary.length > 0 && (
+              <>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-4 mb-8"> 
+                <div className="top-0 z-10 px-2 pb-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-slate-800 uppercase">Companies Summary</h3>
+                    <p className="text-xs text-slate-500">{currentSummaryIndex + 1} of {companiesSummary.length}</p>
+                  </div>
+                </div>
+                <div className="relative">
+                  <motion.div
+                    key={companiesSummary[currentSummaryIndex].company._id}
+                    className="bg-white/80 backdrop-blur-sm rounded-xl border p-4 hover:shadow-2xl hover:scale-105 transition-all duration-300"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                  >
+                    <div className="flex items-center gap-2.5 mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg shrink-0">
+                        <Building2 className="h-4 w-4 text-slate-600" />
+                      </div>
+                      <h3 className="font-semibold text-slate-800 text-base truncate">
+                        {companiesSummary[currentSummaryIndex].company.name}
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="bg-blue-50 rounded-lg p-2">
+                        <p className="text-xs text-blue-600">Sales</p>
+                        <p className="font-medium text-blue-700 truncate">
+                          ₹{companiesSummary[currentSummaryIndex].totals.totalSales.toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-2">
+                        <p className="text-xs text-orange-600">Purchases</p>
+                        <p className="font-medium text-orange-700 truncate">
+                          ₹{companiesSummary[currentSummaryIndex].totals.totalPurchases.toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mb-2">
+                      <div className="bg-emerald-50 rounded-lg p-2">
+                        <p className="text-xs text-emerald-600">Received</p>
+                        <p className="font-medium text-emerald-700 truncate">
+                          ₹{companiesSummary[currentSummaryIndex].totals.totalPaymentsReceived.toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                      <div className="bg-red-50 rounded-lg p-2">
+                        <p className="text-xs text-red-600">Paid</p>
+                        <p className="font-medium text-red-700 truncate">
+                          ₹{companiesSummary[currentSummaryIndex].totals.totalPaymentsMade.toLocaleString('en-IN')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`p-2 rounded-lg ${
+                      companiesSummary[currentSummaryIndex].totals.balanceType === 'Receivable'
+                        ? 'bg-emerald-50'
+                        : 'bg-red-50'
+                    }`}>
+                      <p className={`text-xs ${
+                        companiesSummary[currentSummaryIndex].totals.balanceType === 'Receivable'
+                          ? 'text-emerald-600'
+                          : 'text-red-600'
+                      }`}>Net Balance</p>
+                      <p className={`font-semibold ${
+                        companiesSummary[currentSummaryIndex].totals.balanceType === 'Receivable'
+                          ? 'text-emerald-700'
+                          : 'text-red-700'
+                      } truncate`}>
+                        ₹{companiesSummary[currentSummaryIndex].totals.netBalance.toLocaleString('en-IN')}
+                        ({companiesSummary[currentSummaryIndex].totals.balanceType})
+                      </p>
+                    </div>
+                  </motion.div>
+
+                  {/* Summary Navigation */}
+                  <div className="flex items-center justify-between mt-4 px-2">
+                    <motion.button
+                      onClick={() => setCurrentSummaryIndex(prev => Math.max(0, prev - 1))}
+                      disabled={currentSummaryIndex === 0}
+                      className={`p-2 rounded-lg ${
+                        currentSummaryIndex === 0
+                          ? 'bg-slate-100 text-slate-400'
+                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                      } transition-colors`}
+                      whileHover={currentSummaryIndex !== 0 ? { scale: 1.05 } : {}}
+                      whileTap={currentSummaryIndex !== 0 ? { scale: 0.95 } : {}}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </motion.button>
+                    <div className="flex items-center gap-2">
+                      {[...Array(Math.min(5, companiesSummary.length))].map((_, i) => {
+                        const pageIndex = Math.floor(currentSummaryIndex / 5) * 5 + i;
+                        if (pageIndex >= companiesSummary.length) return null;
+                        return (
+                          <motion.button
+                            key={pageIndex}
+                            onClick={() => setCurrentSummaryIndex(pageIndex)}
+                            className={`w-2 h-2 rounded-full transition-all ${
+                              currentSummaryIndex === pageIndex
+                                ? 'bg-violet-600 scale-125'
+                                : 'bg-slate-300 hover:bg-violet-400'
+                            }`}
+                            whileHover={{ scale: 1.2 }}
+                            whileTap={{ scale: 0.8 }}
+                          />
+                        );
+                      })}
+                    </div>
+                    <motion.button
+                      onClick={() => setCurrentSummaryIndex(prev => 
+                        Math.min(companiesSummary.length - 1, prev + 1)
+                      )}
+                      disabled={currentSummaryIndex === companiesSummary.length - 1}
+                      className={`p-2 rounded-lg ${
+                        currentSummaryIndex === companiesSummary.length - 1
+                          ? 'bg-slate-100 text-slate-400'
+                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100'
+                      } transition-colors`}
+                      whileHover={currentSummaryIndex !== companiesSummary.length - 1 ? { scale: 1.05 } : {}}
+                      whileTap={currentSummaryIndex !== companiesSummary.length - 1 ? { scale: 0.95 } : {}}
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </motion.button>
+                  </div>
+                </div>
+                </div>
+              </>
+            )}
+
+            
+          </>
+        )}
+      </div>
     </motion.div>
   );
 };
+
+// Reusable StatCard Component
+const StatCard = ({ title, value, subtitle, icon, gradient, bgGradient, isLoading }) => (
+  <motion.div
+    className={`relative p-3 sm:p-4 bg-gradient-to-br ${bgGradient} rounded-xl shadow-lg border border-slate-200/50 overflow-hidden group hover:shadow-xl transition-all duration-300`}
+    whileHover={{ y: -2 }}
+  >
+    <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`} />
+    <div className="relative z-10">
+      <div className="flex items-center justify-between mb-2">
+        <div className={`p-2 rounded-lg bg-gradient-to-br ${gradient} text-white shadow-lg`}>
+          {icon}
+        </div>
+        <TrendingUp className=" h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors duration-300" />
+      </div>
+      <div className="hidden sm:block text-center lg:text-left">
+        {isLoading ? (
+          <p className="text-slate-400">Loading...</p>
+        ) : (
+          <>
+            <p className="text-sm lg:text-2xl font-bold text-slate-800 mb-1">
+              ₹{typeof value === 'number' ? value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            </p>
+            <p className="text-xs font-medium text-slate-600">
+              {title}
+              {subtitle && <span className="text-xs ml-1">({subtitle})</span>}
+            </p>
+          </>
+        )}
+      </div>
+      <div className="sm:hidden flex flex-row text-left justify-between mt-6">
+        {isLoading ? (
+          <p className="text-slate-400">Loading...</p>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-slate-600">
+              {title}
+              {subtitle && <span className="text-xs ml-1">({subtitle})</span>}
+            </p>
+            <p className="text-xl lg:text-2xl font-bold text-slate-800">
+              ₹{typeof value === 'number' ? value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  </motion.div>
+);
 
 export default LedgerListPage;

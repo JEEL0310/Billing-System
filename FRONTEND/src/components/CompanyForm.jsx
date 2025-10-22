@@ -59,7 +59,7 @@ const CompanyForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
   return (
     <motion.form
       onSubmit={handleSubmit}
-      className="space-y-6 bg-white shadow-lg rounded-xl p-6 md:p-8"
+      className="space-y-4 bg-white shadow-lg rounded-xl px-6 py-4"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -76,8 +76,9 @@ const CompanyForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           type="text"
           id="companyName"
           value={name}
+          placeholder='e.g., Acme Corp'
           onChange={(e) => setName(e.target.value)}
-          className={`w-full p-3 border ${errors.name ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+          className={`w-full p-3 border ${errors.name ? 'border-red-500' : 'border-gray-200'} text-black rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
         />
         <AnimatePresence>
           {errors.name && (
@@ -104,9 +105,10 @@ const CompanyForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
         <textarea
           id="companyAddress"
           value={address}
+          placeholder='e.g., 123 Main St, City, State, ZIP'
           onChange={(e) => setAddress(e.target.value)}
           rows="3"
-          className={`w-full p-3 border ${errors.address ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+          className={`w-full p-3 border ${errors.address ? 'border-red-500' : 'border-gray-200'} text-black rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
         ></textarea>
         <AnimatePresence>
           {errors.address && (
@@ -134,8 +136,9 @@ const CompanyForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           type="text"
           id="companyGst"
           value={gstNumber}
+          placeholder='e.g., 22AAAAA0000A1Z5'
           onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
-          className={`w-full p-3 border ${errors.gstNumber ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+          className={`w-full p-3 border ${errors.gstNumber ? 'border-red-500' : 'border-gray-200'} text-black rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
         />
         <AnimatePresence>
           {errors.gstNumber && (
@@ -163,8 +166,9 @@ const CompanyForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           type="tel"
           id="companyMobile"
           value={mobileNumber}
+          placeholder='e.g., 9876543210'
           onChange={(e) => setMobileNumber(e.target.value)}
-          className={`w-full p-3 border ${errors.mobileNumber ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+          className={`w-full p-3 border ${errors.mobileNumber ? 'border-red-500' : 'border-gray-200'} text-black rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
         />
         <AnimatePresence>
           {errors.mobileNumber && (
@@ -192,7 +196,7 @@ const CompanyForm = ({ onSubmit, initialData = null, onCancel, isLoading }) => {
           id="companyType"
           value={companyType}
           onChange={(e) => setCompanyType(e.target.value)}
-          className={`w-full p-3 border ${errors.companyType ? 'border-red-500' : 'border-gray-200'} rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
+          className={`w-full p-3 border ${errors.companyType ? 'border-red-500' : 'border-gray-200'} text-black rounded-lg shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all`}
         >
           {companyTypes.map(type => (
             <option key={type} value={type}>{type}</option>
